@@ -35,5 +35,5 @@ Thumbs.db
 *.swp
 *.swo
 
-# External ERP project
-coreConnect/
+# External ERP project at repository root only
+/coreConnect/
