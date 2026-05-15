@@ -1,0 +1,39 @@
+.DS_Store
+**/.DS_Store
+
+# Maven
+target/
+
+# IDE
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+.vscode/
+
+# Java
+*.class
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*~
+.run/
+
+# Node.js / Next.js
+node_modules/
+.next/
+.env*
+.vercel
+
+# Windows
+Thumbs.db
+
+# Vim
+*.swp
+*.swo
+
+# External ERP project
+coreConnect/

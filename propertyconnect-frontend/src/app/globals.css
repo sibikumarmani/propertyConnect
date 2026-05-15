@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+:root {
+  --background: #edf4f7;
+  --background-deep: #dbe9ee;
+  --foreground: #183247;
+  --foreground-muted: #5c7386;
+  --foreground-subtle: #71879a;
+  --surface: rgba(255, 255, 255, 0.84);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --surface-soft: rgba(255, 255, 255, 0.72);
+  --surface-muted: rgba(244, 249, 250, 0.96);
+  --surface-raised: rgba(255, 255, 255, 0.96);
+  --line: rgba(24, 50, 71, 0.08);
+  --line-strong: rgba(24, 50, 71, 0.16);
+  --brand: #138a9e;
+  --brand-strong: #183247;
+  --brand-soft: #bce8eb;
+  --brand-tint: #f3fbfc;
+  --brand-border: #8bc8d0;
+  --highlight: #1ea672;
+  --success: #2b8a63;
+  --warning: #c9851a;
+  --danger: #c65652;
+  --success-soft: #ecfdf3;
+  --warning-soft: #fff7e8;
+  --danger-soft: #fff0ef;
+  --on-brand: #ffffff;
+  --topbar-start: #14324a;
+  --topbar-mid: #1e5168;
+  --topbar-end: #1f8aa0;
+  --topbar-border: rgba(255, 255, 255, 0.2);
+  --header-button-bg: rgba(255, 255, 255, 0.1);
+  --header-button-border: rgba(255, 255, 255, 0.15);
+  --menu-surface: rgba(235, 244, 247, 0.94);
+  --menu-border: rgba(214, 231, 236, 0.92);
+  --menu-item-text: #5c7386;
+  --menu-active-start: #183247;
+  --menu-active-end: #1b6d7f;
+  --page-surface-top: rgba(255, 255, 255, 0.95);
+  --page-surface-bottom: rgba(244, 249, 250, 0.92);
+  --shadow-soft: 0 20px 50px rgba(15, 37, 54, 0.08);
+  --shadow-panel: 0 28px 70px rgba(24, 50, 71, 0.12);
+  --overlay: rgba(15, 23, 42, 0.36);
+  --html-background:
+    radial-gradient(circle at top left, rgba(19, 138, 158, 0.16), transparent 26%),
+    radial-gradient(circle at 88% 10%, rgba(24, 50, 71, 0.16), transparent 28%),
+    radial-gradient(circle at 40% 100%, rgba(30, 166, 114, 0.10), transparent 24%),
+    linear-gradient(180deg, #f6fbfc 0%, #edf4f7 48%, #e2edf2 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--html-background);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--html-background);
+  color: var(--foreground);
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.display-font {
+  font-family: var(--font-space-grotesk), var(--font-manrope), sans-serif;
+  letter-spacing: 0;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.page-surface {
+  background: linear-gradient(180deg, var(--page-surface-top), var(--page-surface-bottom));
+}
+
+.topbar-shade {
+  background: linear-gradient(135deg, var(--topbar-start), var(--topbar-mid) 52%, var(--topbar-end));
+}
+
+.field {
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  color: var(--foreground);
+  outline: none;
+}
+
+.field::placeholder {
+  color: var(--foreground-subtle);
+}
+
+.field:focus-visible {
+  border-color: var(--brand-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--menu-active-start), var(--menu-active-end));
+  color: var(--on-brand);
+}
+
+.btn-secondary {
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  color: var(--foreground);
+}
+
+.pill {
+  background: var(--surface-raised);
+  color: var(--brand-strong);
+  border: 1px solid var(--line);
+}
+
+.pill-brand {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  border: 1px solid var(--brand-border);
+}
+
+.pill-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.pill-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.pill-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.topbar-button {
+  background: var(--header-button-bg);
+  border: 1px solid var(--header-button-border);
+  color: white;
+}
+
+.overlay-scrim {
+  background: var(--overlay);
+}
+
+::selection {
+  background: rgba(19, 138, 158, 0.2);
+  color: var(--foreground);
+}
