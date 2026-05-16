@@ -1,6 +1,6 @@
 "use client";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_PROPERTYCONNECT_API_URL ?? "http://localhost:8081/propertyConnect/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_PROPERTYCONNECT_API_URL ?? "http://localhost:8080/propertyConnect/api";
 const leasingBaseUrl = `${apiBaseUrl}/propertymanagement/crm-leasing`;
 
 export type Lead = {
