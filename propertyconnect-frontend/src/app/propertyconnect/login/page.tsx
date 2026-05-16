@@ -1,5 +1,5 @@
-import { LoginScreen } from "@/components/auth/login-screen";
+import { Login } from "@/components/auth/login";
 
 export default function PropertyConnectLoginPage() {
-  return <LoginScreen />;
+  return <Login />;
 }

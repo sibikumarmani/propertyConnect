@@ -16,6 +16,10 @@ public final class ApplicationConfig {
 	private static final String CORECONNECT_SOAP_ACTION_PROPERTY_PREFIX = "coreconnect.soap.action.";
 	private static final String PROPERTYCONNECT_APPLICATION_ID_PROPERTY = "propertyconnect.application.id";
 	private static final String PROPERTYCONNECT_TOKEN_SECRET_PROPERTY = "propertyconnect.token.secret";
+	private static final String PROPERTYCONNECT_DB_JDBC_URL_PROPERTY = "propertyconnect.db.jdbcUrl";
+	private static final String PROPERTYCONNECT_DB_USERNAME_PROPERTY = "propertyconnect.db.username";
+	private static final String PROPERTYCONNECT_DB_PASSWORD_PROPERTY = "propertyconnect.db.password";
+	private static final String PROPERTYCONNECT_DB_MAX_POOL_SIZE_PROPERTY = "propertyconnect.db.maxPoolSize";
 	private static final Properties LOCAL_PROPERTIES = loadLocalProperties();
 
 	private ApplicationConfig() {
@@ -65,6 +69,31 @@ public final class ApplicationConfig {
 
 	public static String propertyConnectTokenSecret() {
 		return getConfigValue(PROPERTYCONNECT_TOKEN_SECRET_PROPERTY);
+	}
+
+	public static String propertyConnectDbJdbcUrl() {
+		return getConfigValue(PROPERTYCONNECT_DB_JDBC_URL_PROPERTY);
+	}
+
+	public static String propertyConnectDbUsername() {
+		return getConfigValue(PROPERTYCONNECT_DB_USERNAME_PROPERTY);
+	}
+
+	public static String propertyConnectDbPassword() {
+		return getConfigValue(PROPERTYCONNECT_DB_PASSWORD_PROPERTY);
+	}
+
+	public static int propertyConnectDbMaxPoolSize() {
+		String value = getConfigValue(PROPERTYCONNECT_DB_MAX_POOL_SIZE_PROPERTY);
+		if (isBlank(value)) {
+			return 10;
+		}
+		try {
+			return Integer.parseInt(value);
+		}
+		catch (NumberFormatException ex) {
+			return 10;
+		}
 	}
 
 	private static String getConfigValue(String propertyName) {

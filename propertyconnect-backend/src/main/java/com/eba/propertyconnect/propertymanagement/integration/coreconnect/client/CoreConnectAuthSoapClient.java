@@ -225,6 +225,10 @@ public class CoreConnectAuthSoapClient {
 	private SOAPMessage createSoapResponse(HttpResponse<byte[]> response) throws SOAPException, IOException {
 		byte[] responseBody = response.body();
 		String contentType = response.headers().firstValue("Content-Type").orElse("");
+		if (response.statusCode() >= 400 || isHtmlResponse(contentType, responseBody)) {
+			throw new AuthenticationException("CoreConnect SOAP endpoint returned HTTP " + response.statusCode()
+					+ ". Check coreconnect.soap.endpoint.");
+		}
 		if (isFastInfoset(contentType, responseBody)) {
 			return createFastInfosetSoapResponse(responseBody);
 		}
@@ -232,6 +236,14 @@ public class CoreConnectAuthSoapClient {
 		MimeHeaders headers = new MimeHeaders();
 		headers.addHeader("Content-Type", contentType.isBlank() ? "text/xml; charset=UTF-8" : contentType);
 		return MessageFactory.newInstance().createMessage(headers, new ByteArrayInputStream(responseBody));
+	}
+
+	private boolean isHtmlResponse(String contentType, byte[] responseBody) {
+		if (contentType.toLowerCase().contains("text/html")) {
+			return true;
+		}
+		String body = new String(responseBody, 0, Math.min(responseBody.length, 64), StandardCharsets.UTF_8).trim().toLowerCase();
+		return body.startsWith("<!doctype html") || body.startsWith("<html");
 	}
 
 	private boolean isFastInfoset(String contentType, byte[] responseBody) {

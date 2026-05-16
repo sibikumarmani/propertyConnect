@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.UnitMapper">
+	<resultMap id="resultMapUnit" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Unit">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
+		<result column="unit_code" property="unitCode" jdbcType="VARCHAR" />
+		<result column="unit_type" property="unitType" jdbcType="VARCHAR" />
+		<result column="bedrooms" property="bedrooms" jdbcType="INTEGER" />
+		<result column="asking_rent" property="askingRent" jdbcType="DECIMAL" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+	</resultMap>
+	<insert id="createUnit" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Unit">
+		INSERT INTO pa_mst_unit (property_id, property_name, unit_code, unit_type, bedrooms, asking_rent, status, created_by)
+		VALUES (#{propertyId}, #{propertyName}, #{unitCode}, #{unitType}, #{bedrooms}, #{askingRent}, #{status}, #{createdBy})
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<select id="getUnit" parameterType="long" resultMap="resultMapUnit">SELECT * FROM pa_mst_unit WHERE id = #{id}</select>
+	<select id="searchAvailableUnits" resultMap="resultMapUnit">
+		SELECT * FROM pa_mst_unit
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			status = 'AVAILABLE'
+			<if test="propertyId != null">AND property_id = #{propertyId}</if>
+			<if test="unitType != null">AND unit_type = #{unitType}</if>
+			<if test="bedrooms != null">AND bedrooms = #{bedrooms}</if>
+			<if test="budgetTo != null">AND asking_rent &lt;= #{budgetTo}</if>
+		</trim>
+		ORDER BY property_name, unit_code
+	</select>
+	<update id="updateUnitStatus">UPDATE pa_mst_unit SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+</mapper>

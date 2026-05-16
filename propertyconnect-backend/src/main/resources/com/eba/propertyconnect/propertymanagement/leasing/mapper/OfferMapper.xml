@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.OfferMapper">
+	<resultMap id="resultMapOffer" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
+		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
+		<result column="offer_no" property="offerNo" jdbcType="VARCHAR" />
+		<result column="base_amount" property="baseAmount" jdbcType="DECIMAL" />
+		<result column="discount_amount" property="discountAmount" jdbcType="DECIMAL" />
+		<result column="final_amount" property="finalAmount" jdbcType="DECIMAL" />
+		<result column="special_terms" property="specialTerms" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="approval_required" property="approvalRequired" jdbcType="BIT" />
+	</resultMap>
+	<insert id="createOffer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
+		INSERT INTO pa_txn_leasing_offer (prospect_id, unit_id, offer_no, base_amount, discount_amount, final_amount, special_terms, status, approval_required, created_by)
+		VALUES (#{prospectId}, #{unitId}, #{offerNo}, #{baseAmount}, #{discountAmount}, #{finalAmount}, #{specialTerms}, #{status}, #{approvalRequired}, #{createdBy})
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<select id="getOffer" parameterType="long" resultMap="resultMapOffer">SELECT * FROM pa_txn_leasing_offer WHERE id = #{id}</select>
+	<select id="listOffers" resultMap="resultMapOffer">SELECT * FROM pa_txn_leasing_offer ORDER BY created_at DESC</select>
+	<update id="updateOfferStatus">UPDATE pa_txn_leasing_offer SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+</mapper>

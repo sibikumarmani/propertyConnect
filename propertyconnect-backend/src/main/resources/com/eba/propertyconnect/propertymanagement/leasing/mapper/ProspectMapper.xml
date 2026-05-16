@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.ProspectMapper">
+	<resultMap id="resultMapProspect" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="lead_id" property="leadId" jdbcType="BIGINT" />
+		<result column="prospect_no" property="prospectNo" jdbcType="VARCHAR" />
+		<result column="customer_name" property="customerName" jdbcType="VARCHAR" />
+		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
+		<result column="email" property="email" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
+	</resultMap>
+	<select id="listProspects" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect ORDER BY created_at DESC</select>
+	<select id="getProspect" parameterType="long" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect WHERE id = #{id}</select>
+	<select id="getProspectByLead" parameterType="long" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect WHERE lead_id = #{leadId}</select>
+	<insert id="createProspect" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect">
+		INSERT INTO pa_txn_leasing_prospect (lead_id, prospect_no, customer_name, mobile_no, email, status, created_by)
+		VALUES (#{leadId}, #{prospectNo}, #{customerName}, #{mobileNo}, #{email}, #{status}, #{createdBy})
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<update id="updateProspectStatus">UPDATE pa_txn_leasing_prospect SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+</mapper>

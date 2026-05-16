@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.StatusHistoryMapper">
+	<resultMap id="resultMapStatusHistory" type="com.eba.propertyconnect.propertymanagement.leasing.domain.StatusHistory">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="entity_type" property="entityType" jdbcType="VARCHAR" />
+		<result column="entity_id" property="entityId" jdbcType="BIGINT" />
+		<result column="from_status" property="fromStatus" jdbcType="VARCHAR" />
+		<result column="to_status" property="toStatus" jdbcType="VARCHAR" />
+		<result column="comments" property="comments" jdbcType="VARCHAR" />
+		<result column="changed_by" property="changedBy" jdbcType="BIGINT" />
+		<result column="changed_at" property="changedAt" jdbcType="TIMESTAMP" />
+	</resultMap>
+	<insert id="insertHistory">
+		INSERT INTO pa_txn_leasing_status_history (entity_type, entity_id, from_status, to_status, comments, changed_by)
+		VALUES (#{entityType}, #{entityId}, #{fromStatus}, #{toStatus}, #{comments}, #{changedBy})
+	</insert>
+	<select id="latestHistory" resultMap="resultMapStatusHistory">SELECT * FROM pa_txn_leasing_status_history ORDER BY changed_at DESC LIMIT 25</select>
+	<select id="count" resultType="long">
+		SELECT COUNT(*) FROM ${table}
+		<if test="whereClause != null">WHERE ${whereClause}</if>
+	</select>
+</mapper>

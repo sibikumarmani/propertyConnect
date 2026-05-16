@@ -1,5 +1,5 @@
-import { DashboardShell } from "@/components/auth/dashboard-shell";
+import { Dashboard } from "@/components/auth/dashboard";
 
 export default function PropertyConnectDashboardPage() {
-  return <DashboardShell />;
+  return <Dashboard />;
 }

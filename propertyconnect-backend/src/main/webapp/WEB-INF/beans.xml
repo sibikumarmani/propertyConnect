@@ -4,4 +4,7 @@
 	xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/beans_4_0.xsd"
 	bean-discovery-mode="annotated"
 	version="4.0">
+	<interceptors>
+		<class>org.mybatis.cdi.JtaTransactionInterceptor</class>
+	</interceptors>
 </beans>

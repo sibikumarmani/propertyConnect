@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.PaymentReceiptMapper">
+	<resultMap id="resultMapPaymentReceipt" type="com.eba.propertyconnect.propertymanagement.leasing.domain.PaymentReceipt">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="reservation_id" property="reservationId" jdbcType="BIGINT" />
+		<result column="receipt_no" property="receiptNo" jdbcType="VARCHAR" />
+		<result column="amount" property="amount" jdbcType="DECIMAL" />
+		<result column="payment_method" property="paymentMethod" jdbcType="VARCHAR" />
+		<result column="paid_at" property="paidAt" jdbcType="TIMESTAMP" />
+		<result column="erp_receipt_id" property="erpReceiptId" jdbcType="BIGINT" />
+	</resultMap>
+	<insert id="createPaymentReceipt" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.PaymentReceipt">
+		INSERT INTO pa_txn_leasing_payment_receipt (reservation_id, receipt_no, amount, payment_method, paid_at, erp_receipt_id, created_by)
+		VALUES (#{reservationId}, #{receiptNo}, #{amount}, #{paymentMethod}, #{paidAt}, #{erpReceiptId}, #{createdBy})
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<select id="getPaymentReceipt" parameterType="long" resultMap="resultMapPaymentReceipt">SELECT * FROM pa_txn_leasing_payment_receipt WHERE id = #{id}</select>
+</mapper>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.ReservationMapper">
+	<resultMap id="resultMapReservation" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="reservation_no" property="reservationNo" jdbcType="VARCHAR" />
+		<result column="lead_id" property="leadId" jdbcType="BIGINT" />
+		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
+		<result column="offer_id" property="offerId" jdbcType="BIGINT" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="approval_status" property="approvalStatus" jdbcType="VARCHAR" />
+		<result column="reservation_fee" property="reservationFee" jdbcType="DECIMAL" />
+		<result column="paid_amount" property="paidAmount" jdbcType="DECIMAL" />
+		<result column="payment_waived" property="paymentWaived" jdbcType="BIT" />
+		<result column="expires_at" property="expiresAt" jdbcType="TIMESTAMP" />
+	</resultMap>
+	<insert id="createReservation" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation">
+		INSERT INTO pa_txn_leasing_reservation (
+			reservation_no, lead_id, prospect_id, offer_id, property_id, unit_id, status, approval_status, reservation_fee, paid_amount, payment_waived, expires_at, created_by
+		)
+		VALUES (
+			#{reservationNo}, #{leadId}, #{prospectId}, #{offerId}, #{propertyId}, #{unitId}, #{status}, #{approvalStatus}, #{reservationFee}, #{paidAmount}, #{paymentWaived}, #{expiresAt}, #{createdBy}
+		)
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<select id="getReservation" parameterType="long" resultMap="resultMapReservation">SELECT * FROM pa_txn_leasing_reservation WHERE id = #{id}</select>
+	<select id="listReservations" resultMap="resultMapReservation">SELECT * FROM pa_txn_leasing_reservation ORDER BY created_at DESC</select>
+	<update id="updateReservationApproval">UPDATE pa_txn_leasing_reservation SET status = #{status}, approval_status = #{approvalStatus}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+	<update id="updateReservationStatus">UPDATE pa_txn_leasing_reservation SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+	<update id="addReservationPayment">UPDATE pa_txn_leasing_reservation SET paid_amount = paid_amount + #{amount}, status = 'APPROVED', updated_by = #{updatedBy} WHERE id = #{id}</update>
+	<select id="hasActiveReservation" parameterType="long" resultType="boolean">
+		SELECT COUNT(*) > 0 FROM pa_txn_leasing_reservation
+		WHERE unit_id = #{unitId}
+		AND status IN ('REQUESTED', 'PENDING_APPROVAL', 'APPROVED', 'PAYMENT_PENDING', 'CONFIRMED')
+	</select>
+</mapper>

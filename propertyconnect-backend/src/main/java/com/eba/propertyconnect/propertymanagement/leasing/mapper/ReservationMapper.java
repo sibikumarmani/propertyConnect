@@ -1,0 +1,28 @@
+package com.eba.propertyconnect.propertymanagement.leasing.mapper;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import org.apache.ibatis.annotations.Param;
+import org.mybatis.cdi.Mapper;
+
+import com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation;
+
+@Mapper
+public interface ReservationMapper {
+
+	public int createReservation(Reservation reservation);
+
+	public Reservation getReservation(Long id);
+
+	public List<Reservation> listReservations();
+
+	public int updateReservationApproval(@Param("id") Long id, @Param("status") String status, @Param("approvalStatus") String approvalStatus,
+			@Param("updatedBy") Long updatedBy);
+
+	public int updateReservationStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);
+
+	public int addReservationPayment(@Param("id") Long id, @Param("amount") BigDecimal amount, @Param("updatedBy") Long updatedBy);
+
+	public boolean hasActiveReservation(Long unitId);
+}

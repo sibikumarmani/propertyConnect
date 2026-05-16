@@ -26,6 +26,32 @@ The application is exposed under `/api`.
 GET /api/health
 POST /api/auth/login
 POST /api/auth/company
+GET /api/propertymanagement/crm-leasing/leads
+POST /api/propertymanagement/crm-leasing/leads
+POST /api/propertymanagement/crm-leasing/leads/{id}/qualify
+POST /api/propertymanagement/crm-leasing/leads/{id}/convert-to-prospect
+GET /api/propertymanagement/crm-leasing/prospects
+POST /api/propertymanagement/crm-leasing/requirements
+POST /api/propertymanagement/crm-leasing/units/search
+POST /api/propertymanagement/crm-leasing/site-visits
+GET /api/propertymanagement/crm-leasing/offers
+POST /api/propertymanagement/crm-leasing/offers
+POST /api/propertymanagement/crm-leasing/negotiations
+GET /api/propertymanagement/crm-leasing/reservations
+POST /api/propertymanagement/crm-leasing/reservations
+POST /api/propertymanagement/crm-leasing/reservations/{id}/approval
+POST /api/propertymanagement/crm-leasing/reservations/{id}/payment
+POST /api/propertymanagement/crm-leasing/reservations/{id}/confirm
+POST /api/propertymanagement/crm-leasing/reservations/{id}/move-to-lease
+GET /api/propertymanagement/crm-leasing/reports/summary
+```
+
+## CRM Leasing Database
+
+Apply the CRM Leasing sample DDL before using the Lead / Prospect to Reservation module:
+
+```sh
+mysql -u root propertyconnect_db < src/main/resources/db/migration/V001__crm_leasing.sql
 ```
 
 ## Login Integration

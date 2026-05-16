@@ -6,14 +6,19 @@ import { useEffect, useMemo, useState } from "react";
 import { selectCompany, type CompanyMapping } from "@/lib/auth";
 
 const tokenKey = "propertyConnect.authToken";
+const userKey = "propertyConnect.user";
 const companiesKey = "propertyConnect.companies";
 const userProfileKey = "propertyConnect.userProfile";
 const selectedCompanyKey = "propertyConnect.selectedCompany";
+const companySelectionReturnPathKey = "propertyConnect.companySelectionReturnPath";
+const previousCompanyKey = "propertyConnect.previousCompany";
 const loginPath = "/propertyconnect/login";
+const companySelectionPath = "/propertyconnect/company-selection";
 const dashboardPath = "/propertyconnect/dashboard";
 
 export function CompanySelection() {
   const [companies, setCompanies] = useState<CompanyMapping[]>([]);
+  const [userName, setUserName] = useState("");
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,8 +33,15 @@ export function CompanySelection() {
         return;
       }
 
+      if (storage.getItem(selectedCompanyKey)) {
+        window.location.replace(dashboardPath);
+        return;
+      }
+
       const mappedCompanies = readCompanies(storage);
+      const user = readStoredObject<{ name?: string }>(storage, userKey);
       setCompanies(mappedCompanies);
+      setUserName(user?.name ?? "");
       setSelectedCompanyId(mappedCompanies[0]?.id ?? "");
       setIsLoaded(true);
     }, 0);
@@ -58,6 +70,7 @@ export function CompanySelection() {
       storage.setItem(tokenKey, result.token);
       storage.setItem(userProfileKey, JSON.stringify(result.userProfile));
       storage.setItem(selectedCompanyKey, JSON.stringify(selectedCompany));
+      clearSwitchCompanyState(storage);
       window.location.assign(dashboardPath);
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Unable to select company.");
@@ -65,13 +78,35 @@ export function CompanySelection() {
     }
   }
 
+  function cancelSelection() {
+    const storage = getAuthStorage();
+
+    if (!storage) {
+      window.location.assign(loginPath);
+      return;
+    }
+
+    const returnPath = safeReturnPath(storage.getItem(companySelectionReturnPathKey));
+    const previousCompany = storage.getItem(previousCompanyKey);
+    clearSwitchCompanyState(storage);
+
+    if (returnPath && previousCompany) {
+      storage.setItem(selectedCompanyKey, previousCompany);
+      window.location.assign(returnPath);
+      return;
+    }
+
+    signOut();
+  }
+
   function signOut() {
     [localStorage, sessionStorage].forEach((storage) => {
       storage.removeItem(tokenKey);
       storage.removeItem(companiesKey);
       storage.removeItem(selectedCompanyKey);
-      storage.removeItem("propertyConnect.user");
+      storage.removeItem(userKey);
       storage.removeItem(userProfileKey);
+      clearSwitchCompanyState(storage);
     });
     window.location.assign(loginPath);
   }
@@ -115,7 +150,7 @@ export function CompanySelection() {
               Choose your active company
             </h1>
             <p className="mt-3 text-sm leading-7 text-[color:var(--foreground-muted)]">
-              Continue with one of the companies mapped to your coreConnect user account.
+              {userName ? `Welcome ${userName}. ` : ""}Continue with one of the companies mapped to your coreConnect user account.
             </p>
           </div>
 
@@ -158,7 +193,7 @@ export function CompanySelection() {
               ) : null}
 
               <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button className="btn-secondary h-12 rounded-2xl px-5 text-sm font-semibold" onClick={signOut} type="button">
+                <button className="btn-secondary h-12 rounded-2xl px-5 text-sm font-semibold" onClick={cancelSelection} type="button">
                   Cancel
                 </button>
                 <button
@@ -181,6 +216,19 @@ export function CompanySelection() {
       </section>
     </main>
   );
+}
+
+function clearSwitchCompanyState(storage: Storage) {
+  storage.removeItem(companySelectionReturnPathKey);
+  storage.removeItem(previousCompanyKey);
+}
+
+function safeReturnPath(path: string | null) {
+  if (!path || path === companySelectionPath || path === loginPath) {
+    return "";
+  }
+
+  return path.startsWith("/propertyconnect/") ? path : "";
 }
 
 function getAuthStorage() {
@@ -222,5 +270,20 @@ function readUserProfile(storage: Storage): Record<string, unknown> {
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
+  }
+}
+
+function readStoredObject<T>(storage: Storage, key: string): T | null {
+  const rawValue = storage.getItem(key);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }
