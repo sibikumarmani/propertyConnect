@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document describes the CRM leasing process implemented in PropertyConnect.
+This document describes the Customer management process implemented in PropertyConnect.
 
 Backend module:
 
@@ -13,7 +13,7 @@ com.eba.propertyconnect.propertymanagement.leasing
 Frontend route group:
 
 ```text
-propertyconnect-frontend/src/app/propertyconnect/crm-leasing
+propertyconnect-frontend/src/app/propertyconnect/customer-management
 ```
 
 ## Process Steps

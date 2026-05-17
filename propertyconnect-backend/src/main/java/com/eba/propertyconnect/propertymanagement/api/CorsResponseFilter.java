@@ -19,6 +19,7 @@ public class CorsResponseFilter implements ContainerRequestFilter, ContainerResp
 			"http://127.0.0.1:3000",
 			"http://localhost:3001",
 			"http://127.0.0.1:3001");
+	private static final String ALLOWED_HEADERS = "Content-Type,Authorization,X-Company-Id";
 
 	@Override
 	public void filter(ContainerRequestContext requestContext) throws IOException {
@@ -46,7 +47,7 @@ public class CorsResponseFilter implements ContainerRequestFilter, ContainerResp
 		responseContext.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");
 		responseContext.getHeaders().putSingle("Vary", "Origin");
 		responseContext.getHeaders().putSingle("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-		responseContext.getHeaders().putSingle("Access-Control-Allow-Headers", "Content-Type,Authorization");
+		responseContext.getHeaders().putSingle("Access-Control-Allow-Headers", ALLOWED_HEADERS);
 		responseContext.getHeaders().putSingle("Access-Control-Max-Age", "3600");
 	}
 
@@ -56,7 +57,7 @@ public class CorsResponseFilter implements ContainerRequestFilter, ContainerResp
 				.header("Access-Control-Allow-Credentials", "true")
 				.header("Vary", "Origin")
 				.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-				.header("Access-Control-Allow-Headers", "Content-Type,Authorization")
+				.header("Access-Control-Allow-Headers", ALLOWED_HEADERS)
 				.header("Access-Control-Max-Age", "3600");
 	}
 }

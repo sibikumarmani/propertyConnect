@@ -104,6 +104,7 @@ Key columns:
 
 ```text
 id
+company_id
 prospect_id
 property_id
 property_name
@@ -127,6 +128,7 @@ Key columns:
 
 ```text
 id
+company_id
 prospect_id
 unit_id
 visit_at
@@ -146,6 +148,7 @@ Key columns:
 
 ```text
 id
+company_id
 prospect_id
 unit_id
 offer_no
@@ -169,6 +172,7 @@ Key columns:
 
 ```text
 id
+company_id
 offer_id
 proposed_amount
 notes
@@ -185,6 +189,7 @@ Key columns:
 
 ```text
 id
+company_id
 reservation_no
 lead_id
 prospect_id

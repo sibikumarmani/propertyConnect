@@ -1,27 +1,30 @@
 # Frontend Component Patterns
 
-## CRM Leasing Workspace
+## Customer Management Screens
 
-CRM leasing screens should use:
+Customer management screens are split by process:
 
 ```text
-propertyconnect-frontend/src/components/crm-leasing/leasing-workspace.tsx
+propertyconnect-frontend/src/components/lead/lead.tsx
+propertyconnect-frontend/src/components/prospect/prospect.tsx
+propertyconnect-frontend/src/components/reports/customer-management-reports.tsx
 ```
 
 Use it for:
 
-- workflow navigation
-- common leasing page structure
-- summary panels
-- shared loading/error handling
-- consistent status presentation
+- focused lead capture and conversion
+- prospect activity, offer, negotiation, and reservation workflows
+- customer management reports
+- shared drawer-based create/edit actions
 
 ## API Helpers
 
-CRM leasing API calls belong in:
+Customer management API calls belong in:
 
 ```text
-propertyconnect-frontend/src/lib/crm-leasing.ts
+propertyconnect-frontend/src/lib/lead.ts
+propertyconnect-frontend/src/lib/prospect.ts
+propertyconnect-frontend/src/lib/reports.ts
 ```
 
 Rules:
@@ -49,10 +52,9 @@ Use tables for:
 
 - lead lists
 - prospects
-- unit search results
 - offers
 - negotiations
-- reservation queues
+- reservations
 - payment receipts
 - reports
 

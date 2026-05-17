@@ -3,6 +3,7 @@
 <mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.RequirementMapper">
 	<resultMap id="resultMapRequirement" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
 		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
@@ -12,11 +13,32 @@
 		<result column="budget_to" property="budgetTo" jdbcType="DECIMAL" />
 		<result column="move_in_date" property="moveInDate" jdbcType="DATE" />
 		<result column="notes" property="notes" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="saveRequirement" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement">
-		INSERT INTO pa_txn_leasing_requirement (prospect_id, property_id, property_name, unit_type, bedrooms, budget_from, budget_to, move_in_date, notes, created_by)
-		VALUES (#{prospectId}, #{propertyId}, #{propertyName}, #{unitType}, #{bedrooms}, #{budgetFrom}, #{budgetTo}, #{moveInDate}, #{notes}, #{createdBy})
+		INSERT INTO pa_txn_leasing_requirement (company_id, prospect_id, property_id, property_name, unit_type, bedrooms, budget_from, budget_to, move_in_date, notes, created_by)
+		VALUES (#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{unitType}, #{bedrooms}, #{budgetFrom}, #{budgetTo}, #{moveInDate}, #{notes}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getRequirement" parameterType="long" resultMap="resultMapRequirement">SELECT * FROM pa_txn_leasing_requirement WHERE id = #{id}</select>
+	<select id="listRequirementsByProspect" parameterType="long" resultMap="resultMapRequirement">
+		SELECT * FROM pa_txn_leasing_requirement WHERE prospect_id = #{prospectId} ORDER BY created_at DESC
+	</select>
+	<update id="updateRequirement" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement">
+		UPDATE pa_txn_leasing_requirement
+		SET company_id = #{companyId},
+			property_id = #{propertyId},
+			property_name = #{propertyName},
+			unit_type = #{unitType},
+			bedrooms = #{bedrooms},
+			budget_from = #{budgetFrom},
+			budget_to = #{budgetTo},
+			move_in_date = #{moveInDate},
+			notes = #{notes},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
 </mapper>

@@ -3,14 +3,15 @@
 <mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.NegotiationMapper">
 	<resultMap id="resultMapNegotiation" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="offer_id" property="offerId" jdbcType="BIGINT" />
 		<result column="proposed_amount" property="proposedAmount" jdbcType="DECIMAL" />
 		<result column="notes" property="notes" jdbcType="VARCHAR" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
 	</resultMap>
 	<insert id="createNegotiation" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation">
-		INSERT INTO pa_txn_leasing_negotiation (offer_id, proposed_amount, notes, status, created_by)
-		VALUES (#{offerId}, #{proposedAmount}, #{notes}, #{status}, #{createdBy})
+		INSERT INTO pa_txn_leasing_negotiation (company_id, offer_id, proposed_amount, notes, status, created_by)
+		VALUES (#{companyId}, #{offerId}, #{proposedAmount}, #{notes}, #{status}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getNegotiation" parameterType="long" resultMap="resultMapNegotiation">SELECT * FROM pa_txn_leasing_negotiation WHERE id = #{id}</select>

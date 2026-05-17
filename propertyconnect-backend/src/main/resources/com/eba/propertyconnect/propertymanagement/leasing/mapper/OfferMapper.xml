@@ -3,6 +3,7 @@
 <mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.OfferMapper">
 	<resultMap id="resultMapOffer" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
 		<result column="offer_no" property="offerNo" jdbcType="VARCHAR" />
@@ -14,11 +15,33 @@
 		<result column="approval_required" property="approvalRequired" jdbcType="BIT" />
 	</resultMap>
 	<insert id="createOffer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
-		INSERT INTO pa_txn_leasing_offer (prospect_id, unit_id, offer_no, base_amount, discount_amount, final_amount, special_terms, status, approval_required, created_by)
-		VALUES (#{prospectId}, #{unitId}, #{offerNo}, #{baseAmount}, #{discountAmount}, #{finalAmount}, #{specialTerms}, #{status}, #{approvalRequired}, #{createdBy})
+		INSERT INTO pa_txn_leasing_offer (company_id, prospect_id, unit_id, offer_no, base_amount, discount_amount, final_amount, special_terms, status, approval_required, created_by)
+		VALUES (#{companyId}, #{prospectId}, #{unitId}, #{offerNo}, #{baseAmount}, #{discountAmount}, #{finalAmount}, #{specialTerms}, #{status}, #{approvalRequired}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getOffer" parameterType="long" resultMap="resultMapOffer">SELECT * FROM pa_txn_leasing_offer WHERE id = #{id}</select>
-	<select id="listOffers" resultMap="resultMapOffer">SELECT * FROM pa_txn_leasing_offer ORDER BY created_at DESC</select>
+	<select id="listOffers" resultMap="resultMapOffer">
+		SELECT * FROM pa_txn_leasing_offer
+		<where>
+			<if test="companyId != null">company_id = #{companyId}</if>
+		</where>
+		ORDER BY created_at DESC
+	</select>
+	<select id="listOffersByProspect" parameterType="long" resultMap="resultMapOffer">
+		SELECT * FROM pa_txn_leasing_offer WHERE prospect_id = #{prospectId} ORDER BY created_at DESC
+	</select>
+	<update id="updateOffer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
+		UPDATE pa_txn_leasing_offer
+		SET company_id = #{companyId},
+			unit_id = #{unitId},
+			base_amount = #{baseAmount},
+			discount_amount = #{discountAmount},
+			final_amount = #{finalAmount},
+			special_terms = #{specialTerms},
+			status = #{status},
+			approval_required = #{approvalRequired},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
 	<update id="updateOfferStatus">UPDATE pa_txn_leasing_offer SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 </mapper>

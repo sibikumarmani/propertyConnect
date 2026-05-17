@@ -3,6 +3,7 @@
 <mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.LeadMapper">
 	<resultMap id="resultMapLead" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Lead">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="lead_no" property="leadNo" jdbcType="VARCHAR" />
 		<result column="customer_name" property="customerName" jdbcType="VARCHAR" />
 		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
@@ -17,13 +18,30 @@
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
 		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
 	</resultMap>
-	<select id="listLeads" resultMap="resultMapLead">SELECT * FROM pa_txn_leasing_lead ORDER BY created_at DESC</select>
+	<select id="listLeads" resultMap="resultMapLead">
+		SELECT * FROM pa_txn_leasing_lead
+		<where>
+			<if test="companyId != null">company_id = #{companyId}</if>
+		</where>
+		ORDER BY created_at DESC
+	</select>
 	<select id="getLead" parameterType="long" resultMap="resultMapLead">SELECT * FROM pa_txn_leasing_lead WHERE id = #{id, jdbcType=BIGINT}</select>
 	<insert id="createLead" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Lead">
-		INSERT INTO pa_txn_leasing_lead (lead_no, customer_name, mobile_no, email, source, purpose, status, created_by)
-		VALUES (#{leadNo}, #{customerName}, #{mobileNo}, #{email}, #{source}, #{purpose}, #{status}, #{createdBy})
+		INSERT INTO pa_txn_leasing_lead (company_id, lead_no, customer_name, mobile_no, email, source, purpose, status, created_by)
+		VALUES (#{companyId}, #{leadNo}, #{customerName}, #{mobileNo}, #{email}, #{source}, #{purpose}, #{status}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
+	<update id="updateLead" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Lead">
+		UPDATE pa_txn_leasing_lead
+		SET company_id = #{companyId},
+			customer_name = #{customerName},
+			mobile_no = #{mobileNo},
+			email = #{email},
+			source = #{source},
+			purpose = #{purpose},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
 	<update id="qualifyLead">UPDATE pa_txn_leasing_lead SET status = 'QUALIFIED', qualification_score = #{score}, qualification_notes = #{notes}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 	<update id="updateLeadStatus">UPDATE pa_txn_leasing_lead SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 </mapper>

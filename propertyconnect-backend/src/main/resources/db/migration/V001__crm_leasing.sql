@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS pa_mst_unit (
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_lead (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     lead_no VARCHAR(50) NOT NULL,
     customer_name VARCHAR(255) NOT NULL,
     mobile_no VARCHAR(60) NOT NULL,
@@ -31,12 +32,14 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_lead (
     updated_by BIGINT NULL,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_pa_txn_leasing_lead_no (lead_no),
+    KEY idx_pa_txn_leasing_lead_company (company_id),
     KEY idx_pa_txn_leasing_lead_status (status, created_at),
     KEY idx_pa_txn_leasing_lead_mobile (mobile_no)
 );
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_prospect (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     lead_id BIGINT NOT NULL,
     prospect_no VARCHAR(50) NOT NULL,
     customer_name VARCHAR(255) NOT NULL,
@@ -47,6 +50,7 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_prospect (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by BIGINT NULL,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_pa_txn_leasing_prospect_company (company_id),
     UNIQUE KEY uq_pa_txn_leasing_prospect_no (prospect_no),
     UNIQUE KEY uq_pa_txn_leasing_prospect_lead (lead_id),
     CONSTRAINT fk_pa_txn_leasing_prospect_lead FOREIGN KEY (lead_id) REFERENCES pa_txn_leasing_lead(id)
@@ -54,6 +58,7 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_prospect (
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_requirement (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     prospect_id BIGINT NOT NULL,
     property_id BIGINT NULL,
     property_name VARCHAR(255) NULL,
@@ -67,12 +72,14 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_requirement (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by BIGINT NULL,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_pa_txn_leasing_req_company (company_id),
     KEY idx_pa_txn_leasing_req_prospect (prospect_id),
     CONSTRAINT fk_pa_txn_leasing_req_prospect FOREIGN KEY (prospect_id) REFERENCES pa_txn_leasing_prospect(id)
 );
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_site_visit (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     prospect_id BIGINT NOT NULL,
     unit_id BIGINT NOT NULL,
     visit_at DATETIME NOT NULL,
@@ -82,6 +89,7 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_site_visit (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by BIGINT NULL,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_pa_txn_leasing_visit_company (company_id),
     KEY idx_pa_txn_leasing_visit_prospect (prospect_id, visit_at),
     KEY idx_pa_txn_leasing_visit_unit (unit_id, visit_at),
     CONSTRAINT fk_pa_txn_leasing_visit_prospect FOREIGN KEY (prospect_id) REFERENCES pa_txn_leasing_prospect(id),
@@ -90,6 +98,7 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_site_visit (
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_offer (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     prospect_id BIGINT NOT NULL,
     unit_id BIGINT NOT NULL,
     offer_no VARCHAR(50) NOT NULL,
@@ -104,6 +113,7 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_offer (
     updated_by BIGINT NULL,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_pa_txn_leasing_offer_no (offer_no),
+    KEY idx_pa_txn_leasing_offer_company (company_id),
     KEY idx_pa_txn_leasing_offer_prospect (prospect_id, status),
     KEY idx_pa_txn_leasing_offer_unit (unit_id, status),
     CONSTRAINT fk_pa_txn_leasing_offer_prospect FOREIGN KEY (prospect_id) REFERENCES pa_txn_leasing_prospect(id),
@@ -112,18 +122,21 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_offer (
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_negotiation (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     offer_id BIGINT NOT NULL,
     proposed_amount DECIMAL(18,2) NOT NULL,
     notes TEXT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'OPEN',
     created_by BIGINT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_pa_txn_leasing_neg_company (company_id),
     KEY idx_pa_txn_leasing_neg_offer (offer_id, created_at),
     CONSTRAINT fk_pa_txn_leasing_neg_offer FOREIGN KEY (offer_id) REFERENCES pa_txn_leasing_offer(id)
 );
 
 CREATE TABLE IF NOT EXISTS pa_txn_leasing_reservation (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     reservation_no VARCHAR(50) NOT NULL,
     lead_id BIGINT NOT NULL,
     prospect_id BIGINT NOT NULL,
@@ -141,6 +154,7 @@ CREATE TABLE IF NOT EXISTS pa_txn_leasing_reservation (
     updated_by BIGINT NULL,
     updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_pa_txn_leasing_reservation_no (reservation_no),
+    KEY idx_pa_txn_leasing_res_company (company_id),
     KEY idx_pa_txn_leasing_res_unit_status (unit_id, status),
     KEY idx_pa_txn_leasing_res_prospect (prospect_id, status),
     KEY idx_pa_txn_leasing_res_offer (offer_id),

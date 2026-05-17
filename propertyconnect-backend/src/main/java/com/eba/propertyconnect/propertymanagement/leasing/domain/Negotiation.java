@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 public class Negotiation extends AuditModel {
 
 	public Long id;
+	public Long companyId;
 	public Long offerId;
 	public BigDecimal proposedAmount;
 	public String notes;

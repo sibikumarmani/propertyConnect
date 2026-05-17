@@ -55,7 +55,7 @@ Do not create repository classes for the current backend style. Use MyBatis mapp
 
 ## Current Module
 
-The active business module is CRM Leasing: lead/prospect to reservation.
+The active business module is Customer Management: lead/prospect to reservation.
 
 Current package:
 
@@ -66,7 +66,7 @@ com.eba.propertyconnect.propertymanagement.leasing
 Current frontend route group:
 
 ```text
-propertyconnect-frontend/src/app/propertyconnect/crm-leasing
+propertyconnect-frontend/src/app/propertyconnect/customer-management
 ```
 
 ## Key Project Rules
@@ -99,7 +99,7 @@ Frontend:
 - [Layout Design](docs/frontend/layout-design.md)
 - [Component Patterns](docs/frontend/component-patterns.md)
 
-CRM Leasing:
+Customer Management:
 
 - [Lead To Reservation Process](docs/leasing/lead-to-reservation-process.md)
 - [Leasing Business Rules](docs/leasing/leasing-business-rules.md)

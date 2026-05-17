@@ -70,13 +70,17 @@ public class LeasingService {
 	@Inject
 	private StatusHistoryMapper statusHistoryMapper;
 
-	public List<Lead> listLeads() {
-		return getCompanyCache(CacheHelper.GET_LEASING_LEADS, leadMapper::listLeads);
+	public List<Lead> listLeads(Long companyId) {
+		if (companyId != null) {
+			return leadMapper.listLeads(companyId);
+		}
+		return getCompanyCache(CacheHelper.GET_LEASING_LEADS, () -> leadMapper.listLeads(null));
 	}
 
 	public Lead createLead(Lead request) {
 		requireText(request.customerName, "Customer name is required");
 		requireText(request.mobileNo, "Mobile number is required");
+		requireId(request.companyId, "Company is required");
 		Lead lead = request;
 		lead.leadNo = defaultString(lead.leadNo, nextNumber("LD"));
 		lead.status = defaultString(lead.status, "NEW");
@@ -84,6 +88,22 @@ public class LeasingService {
 		statusHistoryMapper.insertHistory("LEAD", lead.id, null, lead.status, "Lead created", lead.createdBy);
 		clearLeasingCache();
 		return leadMapper.getLead(lead.id);
+	}
+
+	public Lead updateLead(Long leadId, Lead request) {
+		requireId(leadId, "Lead is required");
+		requireText(request.customerName, "Customer name is required");
+		requireText(request.mobileNo, "Mobile number is required");
+		requireId(request.companyId, "Company is required");
+		Lead existingLead = leadMapper.getLead(leadId);
+		if (existingLead == null) {
+			throw new IllegalArgumentException("Lead not found");
+		}
+		Lead lead = request;
+		lead.id = leadId;
+		leadMapper.updateLead(lead);
+		clearLeasingCache();
+		return leadMapper.getLead(leadId);
 	}
 
 	public Lead qualifyLead(Long leadId, QualificationRequest request) {
@@ -105,6 +125,7 @@ public class LeasingService {
 			throw new IllegalArgumentException("Only qualified leads can be converted to prospects");
 		}
 		Prospect prospect = new Prospect();
+		prospect.companyId = lead.companyId;
 		prospect.leadId = leadId;
 		prospect.prospectNo = nextNumber("PR");
 		prospect.customerName = lead.customerName;
@@ -120,8 +141,11 @@ public class LeasingService {
 		return prospectMapper.getProspect(prospect.id);
 	}
 
-	public List<Prospect> listProspects() {
-		return getCompanyCache(CacheHelper.GET_LEASING_PROSPECTS, prospectMapper::listProspects);
+	public List<Prospect> listProspects(Long companyId) {
+		if (companyId != null) {
+			return prospectMapper.listProspects(companyId);
+		}
+		return getCompanyCache(CacheHelper.GET_LEASING_PROSPECTS, () -> prospectMapper.listProspects(null));
 	}
 
 	public Prospect getProspect(Long prospectId) {
@@ -133,11 +157,47 @@ public class LeasingService {
 		if (request.budgetFrom != null && request.budgetTo != null && request.budgetFrom.compareTo(request.budgetTo) > 0) {
 			throw new IllegalArgumentException("Budget from cannot be greater than budget to");
 		}
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
+		}
 		Requirement requirement = request;
+		requirement.companyId = prospect.companyId;
 		requirementMapper.saveRequirement(requirement);
 		statusHistoryMapper.insertHistory("PROSPECT", requirement.prospectId, null, "REQUIREMENT_CAPTURED", "Requirement captured", requirement.createdBy);
 		clearLeasingCache();
 		return requirementMapper.getRequirement(requirement.id);
+	}
+
+	public List<Requirement> listRequirementsByProspect(Long prospectId) {
+		requireId(prospectId, "Prospect is required");
+		return requirementMapper.listRequirementsByProspect(prospectId);
+	}
+
+	public Requirement updateRequirement(Long requirementId, Requirement request) {
+		requireId(requirementId, "Requirement is required");
+		requireId(request.prospectId, "Prospect is required");
+		if (request.budgetFrom != null && request.budgetTo != null && request.budgetFrom.compareTo(request.budgetTo) > 0) {
+			throw new IllegalArgumentException("Budget from cannot be greater than budget to");
+		}
+		Requirement existingRequirement = requirementMapper.getRequirement(requirementId);
+		if (existingRequirement == null) {
+			throw new IllegalArgumentException("Requirement not found");
+		}
+		if (!request.prospectId.equals(existingRequirement.prospectId)) {
+			throw new IllegalArgumentException("Requirement does not belong to selected prospect");
+		}
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
+		}
+		Requirement requirement = request;
+		requirement.id = requirementId;
+		requirement.companyId = prospect.companyId;
+		requirementMapper.updateRequirement(requirement);
+		statusHistoryMapper.insertHistory("PROSPECT", requirement.prospectId, null, "REQUIREMENT_UPDATED", "Requirement updated", requirement.updatedBy);
+		clearLeasingCache();
+		return requirementMapper.getRequirement(requirementId);
 	}
 
 	public Unit createUnit(Unit request) {
@@ -164,6 +224,10 @@ public class LeasingService {
 	public SiteVisit createSiteVisit(SiteVisit request) {
 		requireId(request.prospectId, "Prospect is required");
 		requireId(request.unitId, "Unit is required");
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
+		}
 		Unit unit = unitMapper.getUnit(request.unitId);
 		// Business rule: only available units can be shown and selected.
 		if (!"AVAILABLE".equals(unit.status)) {
@@ -173,11 +237,49 @@ public class LeasingService {
 			throw new IllegalArgumentException("Visit date and time is required");
 		}
 		SiteVisit visit = request;
+		visit.companyId = prospect.companyId;
 		visit.status = defaultString(visit.status, "SCHEDULED");
 		siteVisitMapper.createSiteVisit(visit);
 		statusHistoryMapper.insertHistory("PROSPECT", visit.prospectId, null, "SITE_VISIT_SCHEDULED", "Site visit scheduled", visit.createdBy);
 		clearLeasingCache();
 		return siteVisitMapper.getSiteVisit(visit.id);
+	}
+
+	public List<SiteVisit> listSiteVisitsByProspect(Long prospectId) {
+		requireId(prospectId, "Prospect is required");
+		return siteVisitMapper.listSiteVisitsByProspect(prospectId);
+	}
+
+	public SiteVisit updateSiteVisit(Long siteVisitId, SiteVisit request) {
+		requireId(siteVisitId, "Site visit is required");
+		requireId(request.prospectId, "Prospect is required");
+		requireId(request.unitId, "Unit is required");
+		if (request.visitAt == null) {
+			throw new IllegalArgumentException("Visit date and time is required");
+		}
+		SiteVisit existingVisit = siteVisitMapper.getSiteVisit(siteVisitId);
+		if (existingVisit == null) {
+			throw new IllegalArgumentException("Site visit not found");
+		}
+		if (!request.prospectId.equals(existingVisit.prospectId)) {
+			throw new IllegalArgumentException("Site visit does not belong to selected prospect");
+		}
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
+		}
+		Unit unit = unitMapper.getUnit(request.unitId);
+		if (!"AVAILABLE".equals(unit.status)) {
+			throw new IllegalArgumentException("Only available units can be selected for a site visit");
+		}
+		SiteVisit visit = request;
+		visit.id = siteVisitId;
+		visit.companyId = prospect.companyId;
+		visit.status = defaultString(visit.status, existingVisit.status);
+		siteVisitMapper.updateSiteVisit(visit);
+		statusHistoryMapper.insertHistory("PROSPECT", visit.prospectId, existingVisit.status, visit.status, "Site visit updated", visit.updatedBy);
+		clearLeasingCache();
+		return siteVisitMapper.getSiteVisit(siteVisitId);
 	}
 
 	public Offer createOffer(Offer request) {
@@ -191,10 +293,52 @@ public class LeasingService {
 		// Business rule: discount or special terms should trigger approval.
 		request.approvalRequired = discount.signum() > 0 || hasText(request.specialTerms);
 		request.status = "SENT";
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
+		}
 		Offer offer = request;
+		offer.companyId = prospect.companyId;
 		offer.offerNo = defaultString(offer.offerNo, nextNumber("OF"));
 		offerMapper.createOffer(offer);
 		statusHistoryMapper.insertHistory("OFFER", offer.id, null, offer.status, "Offer created", offer.createdBy);
+		clearLeasingCache();
+		return offerMapper.getOffer(offer.id);
+	}
+
+	public List<Offer> listOffersByProspect(Long prospectId) {
+		requireId(prospectId, "Prospect is required");
+		return offerMapper.listOffersByProspect(prospectId);
+	}
+
+	public Offer updateOffer(Long offerId, Offer request) {
+		requireId(offerId, "Offer is required");
+		requireId(request.prospectId, "Prospect is required");
+		requireId(request.unitId, "Unit is required");
+		if (request.baseAmount == null || request.baseAmount.signum() <= 0) {
+			throw new IllegalArgumentException("Offer base amount is required");
+		}
+		Offer existingOffer = offerMapper.getOffer(offerId);
+		if (existingOffer == null) {
+			throw new IllegalArgumentException("Offer not found");
+		}
+		if (!request.prospectId.equals(existingOffer.prospectId)) {
+			throw new IllegalArgumentException("Offer does not belong to selected prospect");
+		}
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
+		}
+		BigDecimal discount = request.discountAmount == null ? BigDecimal.ZERO : request.discountAmount;
+		request.discountAmount = discount;
+		request.finalAmount = request.finalAmount == null ? request.baseAmount.subtract(discount) : request.finalAmount;
+		request.approvalRequired = discount.signum() > 0 || hasText(request.specialTerms);
+		Offer offer = request;
+		offer.id = offerId;
+		offer.companyId = prospect.companyId;
+		offer.status = defaultString(offer.status, existingOffer.status);
+		offerMapper.updateOffer(offer);
+		statusHistoryMapper.insertHistory("OFFER", offer.id, existingOffer.status, offer.status, "Offer updated", offer.updatedBy);
 		clearLeasingCache();
 		return offerMapper.getOffer(offer.id);
 	}
@@ -205,7 +349,12 @@ public class LeasingService {
 		if (request.proposedAmount == null || request.proposedAmount.signum() <= 0) {
 			throw new IllegalArgumentException("Proposed amount is required");
 		}
+		Offer offer = offerMapper.getOffer(request.offerId);
+		if (offer == null) {
+			throw new IllegalArgumentException("Offer not found");
+		}
 		Negotiation negotiation = request;
+		negotiation.companyId = offer.companyId;
 		negotiation.status = defaultString(negotiation.status, "OPEN");
 		negotiationMapper.createNegotiation(negotiation);
 		offerMapper.updateOfferStatus(negotiation.offerId, "NEGOTIATION", negotiation.createdBy);
@@ -214,8 +363,11 @@ public class LeasingService {
 		return negotiationMapper.getNegotiation(negotiation.id);
 	}
 
-	public List<Offer> listOffers() {
-		return getCompanyCache(CacheHelper.GET_LEASING_OFFERS, offerMapper::listOffers);
+	public List<Offer> listOffers(Long companyId) {
+		if (companyId != null) {
+			return offerMapper.listOffers(companyId);
+		}
+		return getCompanyCache(CacheHelper.GET_LEASING_OFFERS, () -> offerMapper.listOffers(null));
 	}
 
 	@Transactional(rollbackFor = Exception.class)
@@ -223,8 +375,18 @@ public class LeasingService {
 		requireId(request.prospectId, "Prospect is required");
 		requireId(request.offerId, "Offer is required");
 		Offer offer = offerMapper.getOffer(request.offerId);
+		if (offer == null) {
+			throw new IllegalArgumentException("Offer not found");
+		}
 		if (!request.prospectId.equals(offer.prospectId)) {
 			throw new IllegalArgumentException("Offer does not belong to selected prospect");
+		}
+		if (!"APPROVED".equals(offer.status)) {
+			throw new IllegalArgumentException("Only approved offers can be reserved");
+		}
+		Prospect prospect = prospectMapper.getProspect(request.prospectId);
+		if (prospect == null) {
+			throw new IllegalArgumentException("Prospect not found");
 		}
 		Unit unit = unitMapper.getUnit(offer.unitId);
 		// Business rule: only available units can be selected.
@@ -239,7 +401,8 @@ public class LeasingService {
 		reservation.reservationFee = request.reservationFee == null ? BigDecimal.ZERO : request.reservationFee;
 		reservation.paymentWaived = Boolean.TRUE.equals(request.paymentWaived);
 		reservation.reservationNo = nextNumber("RS");
-		reservation.leadId = prospectMapper.getProspect(request.prospectId).leadId;
+		reservation.companyId = prospect.companyId;
+		reservation.leadId = prospect.leadId;
 		reservation.propertyId = unit.propertyId;
 		reservation.unitId = unit.id;
 		boolean approvalRequired = Boolean.TRUE.equals(offer.approvalRequired);
@@ -247,9 +410,16 @@ public class LeasingService {
 		reservation.approvalStatus = approvalRequired ? "PENDING" : "NOT_REQUIRED";
 		reservation.paidAmount = BigDecimal.ZERO;
 		reservationMapper.createReservation(reservation);
+		prospectMapper.updateProspectStatus(reservation.prospectId, "RESERVED", reservation.createdBy);
 		statusHistoryMapper.insertHistory("RESERVATION", reservation.id, null, reservation.status, "Reservation requested", reservation.createdBy);
+		statusHistoryMapper.insertHistory("PROSPECT", reservation.prospectId, prospect.status, "RESERVED", "Reservation requested", reservation.createdBy);
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservation.id);
+	}
+
+	public List<Reservation> listReservationsByProspect(Long prospectId) {
+		requireId(prospectId, "Prospect is required");
+		return reservationMapper.listReservationsByProspect(prospectId);
 	}
 
 	public Reservation approveReservation(Long reservationId, ApprovalRequest request) {
@@ -333,8 +503,11 @@ public class LeasingService {
 		return changeReservationStatus(reservationId, "MOVED_TO_LEASE", updatedBy);
 	}
 
-	public List<Reservation> listReservations() {
-		return getCompanyCache(CacheHelper.GET_LEASING_RESERVATIONS, reservationMapper::listReservations);
+	public List<Reservation> listReservations(Long companyId) {
+		if (companyId != null) {
+			return reservationMapper.listReservations(companyId);
+		}
+		return getCompanyCache(CacheHelper.GET_LEASING_RESERVATIONS, () -> reservationMapper.listReservations(null));
 	}
 
 	public ReportSummary reportSummary() {
@@ -373,7 +546,9 @@ public class LeasingService {
 			unitMapper.updateUnitStatus(reservation.unitId, "AVAILABLE", updatedBy);
 		}
 		if ("MOVED_TO_LEASE".equals(nextStatus)) {
+			Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
 			prospectMapper.updateProspectStatus(reservation.prospectId, "LEASE_PROCESS", updatedBy);
+			statusHistoryMapper.insertHistory("PROSPECT", reservation.prospectId, prospect == null ? null : prospect.status, "LEASE_PROCESS", "Reservation moved to lease", updatedBy);
 		}
 		statusHistoryMapper.insertHistory("RESERVATION", reservationId, reservation.status, nextStatus, "Reservation status changed", updatedBy);
 		clearLeasingCache();

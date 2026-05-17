@@ -5,6 +5,7 @@ import java.util.Date;
 public class SiteVisit extends AuditModel {
 
 	public Long id;
+	public Long companyId;
 	public Long prospectId;
 	public Long unitId;
 	public Date visitAt;

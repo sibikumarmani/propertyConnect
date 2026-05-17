@@ -3,67 +3,67 @@
 Base path:
 
 ```text
-/propertymanagement/crm-leasing
+/propertymanagement/customer-management
 ```
 
 ## Lead
 
 ```text
-GET  /propertymanagement/crm-leasing/leads
-POST /propertymanagement/crm-leasing/leads
-POST /propertymanagement/crm-leasing/leads/{id}/qualify
-POST /propertymanagement/crm-leasing/leads/{id}/convert-to-prospect?createdBy={userId}
+GET  /propertymanagement/customer-management/leads
+POST /propertymanagement/customer-management/leads
+POST /propertymanagement/customer-management/leads/{id}/qualify
+POST /propertymanagement/customer-management/leads/{id}/convert-to-prospect?createdBy={userId}
 ```
 
 ## Prospect
 
 ```text
-GET /propertymanagement/crm-leasing/prospects
-GET /propertymanagement/crm-leasing/prospects/{id}
+GET /propertymanagement/customer-management/prospects
+GET /propertymanagement/customer-management/prospects/{id}
 ```
 
 ## Requirement
 
 ```text
-POST /propertymanagement/crm-leasing/requirements
+POST /propertymanagement/customer-management/requirements
 ```
 
 ## Unit
 
 ```text
-POST /propertymanagement/crm-leasing/units
-POST /propertymanagement/crm-leasing/units/search
+POST /propertymanagement/customer-management/units
+POST /propertymanagement/customer-management/units/search
 ```
 
 ## Site Visit
 
 ```text
-POST /propertymanagement/crm-leasing/site-visits
+POST /propertymanagement/customer-management/site-visits
 ```
 
 ## Offer And Negotiation
 
 ```text
-GET  /propertymanagement/crm-leasing/offers
-POST /propertymanagement/crm-leasing/offers
-POST /propertymanagement/crm-leasing/negotiations
+GET  /propertymanagement/customer-management/offers
+POST /propertymanagement/customer-management/offers
+POST /propertymanagement/customer-management/negotiations
 ```
 
 ## Reservation
 
 ```text
-GET  /propertymanagement/crm-leasing/reservations
-POST /propertymanagement/crm-leasing/reservations
-POST /propertymanagement/crm-leasing/reservations/{id}/approval
-POST /propertymanagement/crm-leasing/reservations/{id}/payment
-POST /propertymanagement/crm-leasing/reservations/{id}/confirm?updatedBy={userId}
-POST /propertymanagement/crm-leasing/reservations/{id}/cancel?updatedBy={userId}
-POST /propertymanagement/crm-leasing/reservations/{id}/expire?updatedBy={userId}
-POST /propertymanagement/crm-leasing/reservations/{id}/move-to-lease?updatedBy={userId}
+GET  /propertymanagement/customer-management/reservations
+POST /propertymanagement/customer-management/reservations
+POST /propertymanagement/customer-management/reservations/{id}/approval
+POST /propertymanagement/customer-management/reservations/{id}/payment
+POST /propertymanagement/customer-management/reservations/{id}/confirm?updatedBy={userId}
+POST /propertymanagement/customer-management/reservations/{id}/cancel?updatedBy={userId}
+POST /propertymanagement/customer-management/reservations/{id}/expire?updatedBy={userId}
+POST /propertymanagement/customer-management/reservations/{id}/move-to-lease?updatedBy={userId}
 ```
 
 ## Reports
 
 ```text
-GET /propertymanagement/crm-leasing/reports/summary
+GET /propertymanagement/customer-management/reports/summary
 ```

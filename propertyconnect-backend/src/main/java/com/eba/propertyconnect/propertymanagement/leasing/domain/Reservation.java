@@ -6,6 +6,7 @@ import java.util.Date;
 public class Reservation extends AuditModel {
 
 	public Long id;
+	public Long companyId;
 	public String reservationNo;
 	public Long leadId;
 	public Long prospectId;

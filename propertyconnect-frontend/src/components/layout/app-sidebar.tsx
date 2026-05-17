@@ -18,9 +18,7 @@ export function AppSidebar({ collapsed, groups, pathname, onToggleCollapse }: Ap
     Executive: true,
     "Customer Management": true,
   });
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
-    "CRM Leasing": true,
-  });
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   return (
     <aside

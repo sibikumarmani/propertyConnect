@@ -10,11 +10,13 @@ import com.eba.propertyconnect.propertymanagement.leasing.domain.Lead;
 @Mapper
 public interface LeadMapper {
 
-	public List<Lead> listLeads();
+	public List<Lead> listLeads(@Param("companyId") Long companyId);
 
 	public Lead getLead(Long id);
 
 	public int createLead(Lead lead);
+
+	public int updateLead(Lead lead);
 
 	public int qualifyLead(@Param("id") Long id, @Param("score") Integer score, @Param("notes") String notes, @Param("updatedBy") Long updatedBy);
 

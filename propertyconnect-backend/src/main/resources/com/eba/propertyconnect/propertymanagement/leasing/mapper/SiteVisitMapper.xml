@@ -3,16 +3,34 @@
 <mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.SiteVisitMapper">
 	<resultMap id="resultMapSiteVisit" type="com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
 		<result column="visit_at" property="visitAt" jdbcType="TIMESTAMP" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
 		<result column="notes" property="notes" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="createSiteVisit" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit">
-		INSERT INTO pa_txn_leasing_site_visit (prospect_id, unit_id, visit_at, status, notes, created_by)
-		VALUES (#{prospectId}, #{unitId}, #{visitAt}, #{status}, #{notes}, #{createdBy})
+		INSERT INTO pa_txn_leasing_site_visit (company_id, prospect_id, unit_id, visit_at, status, notes, created_by)
+		VALUES (#{companyId}, #{prospectId}, #{unitId}, #{visitAt}, #{status}, #{notes}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getSiteVisit" parameterType="long" resultMap="resultMapSiteVisit">SELECT * FROM pa_txn_leasing_site_visit WHERE id = #{id}</select>
+	<select id="listSiteVisitsByProspect" parameterType="long" resultMap="resultMapSiteVisit">
+		SELECT * FROM pa_txn_leasing_site_visit WHERE prospect_id = #{prospectId} ORDER BY visit_at DESC
+	</select>
+	<update id="updateSiteVisit" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit">
+		UPDATE pa_txn_leasing_site_visit
+		SET company_id = #{companyId},
+			unit_id = #{unitId},
+			visit_at = #{visitAt},
+			status = #{status},
+			notes = #{notes},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
 </mapper>

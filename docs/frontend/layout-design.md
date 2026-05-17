@@ -15,7 +15,6 @@ login
 company-selection
 dashboard
 customer-management
-crm-leasing
 ```
 
 ## Layout Components

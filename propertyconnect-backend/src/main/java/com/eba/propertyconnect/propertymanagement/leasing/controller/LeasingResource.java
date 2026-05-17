@@ -2,6 +2,7 @@ package com.eba.propertyconnect.propertymanagement.leasing.controller;
 
 import java.time.LocalDate;
 
+import com.eba.propertyconnect.propertymanagement.auth.service.TokenService;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.ApprovalRequest;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Lead;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation;
@@ -20,22 +21,27 @@ import com.google.gson.JsonObject;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-@Path("/propertymanagement/crm-leasing")
+@Path("/propertymanagement/customer-management")
 @ApplicationScoped
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class LeasingResource {
 
+	private static final String CORE_USER_ID = "userId";
 	private static final Gson GSON = new GsonBuilder()
 			.setDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 			.registerTypeAdapter(LocalDate.class, (com.google.gson.JsonSerializer<LocalDate>) (value, type, context) -> context.serialize(value.toString()))
@@ -44,16 +50,31 @@ public class LeasingResource {
 	@Inject
 	private LeasingService service;
 
+	@Inject
+	private TokenService tokenService;
+
+	@Context
+	private HttpServletRequest httpRequest;
+
 	@GET
 	@Path("/leads")
-	public Response listLeads() {
-		return ok(service.listLeads());
+	public Response listLeads(@QueryParam("companyId") Long companyId) {
+		return ok(service.listLeads(companyId));
 	}
 
 	@POST
 	@Path("/leads")
 	public Response createLead(Lead request) {
-		return created(() -> service.createLead(request));
+		return created(() -> {
+			request.createdBy = loggedUserId(request.createdBy);
+			return service.createLead(request);
+		});
+	}
+
+	@PUT
+	@Path("/leads/{id}")
+	public Response updateLead(@PathParam("id") Long id, Lead request) {
+		return okOrBadRequest(() -> service.updateLead(id, request));
 	}
 
 	@POST
@@ -70,8 +91,8 @@ public class LeasingResource {
 
 	@GET
 	@Path("/prospects")
-	public Response listProspects() {
-		return ok(service.listProspects());
+	public Response listProspects(@QueryParam("companyId") Long companyId) {
+		return ok(service.listProspects(companyId));
 	}
 
 	@GET
@@ -80,10 +101,40 @@ public class LeasingResource {
 		return okOrBadRequest(() -> service.getProspect(id));
 	}
 
+	@GET
+	@Path("/prospects/{id}/requirements")
+	public Response listProspectRequirements(@PathParam("id") Long id) {
+		return okOrBadRequest(() -> service.listRequirementsByProspect(id));
+	}
+
+	@GET
+	@Path("/prospects/{id}/site-visits")
+	public Response listProspectSiteVisits(@PathParam("id") Long id) {
+		return okOrBadRequest(() -> service.listSiteVisitsByProspect(id));
+	}
+
+	@GET
+	@Path("/prospects/{id}/offers")
+	public Response listProspectOffers(@PathParam("id") Long id) {
+		return okOrBadRequest(() -> service.listOffersByProspect(id));
+	}
+
+	@GET
+	@Path("/prospects/{id}/reservations")
+	public Response listProspectReservations(@PathParam("id") Long id) {
+		return okOrBadRequest(() -> service.listReservationsByProspect(id));
+	}
+
 	@POST
 	@Path("/requirements")
 	public Response saveRequirement(Requirement request) {
 		return created(() -> service.saveRequirement(request));
+	}
+
+	@PUT
+	@Path("/requirements/{id}")
+	public Response updateRequirement(@PathParam("id") Long id, Requirement request) {
+		return okOrBadRequest(() -> service.updateRequirement(id, request));
 	}
 
 	@POST
@@ -104,16 +155,28 @@ public class LeasingResource {
 		return created(() -> service.createSiteVisit(request));
 	}
 
+	@PUT
+	@Path("/site-visits/{id}")
+	public Response updateSiteVisit(@PathParam("id") Long id, SiteVisit request) {
+		return okOrBadRequest(() -> service.updateSiteVisit(id, request));
+	}
+
 	@POST
 	@Path("/offers")
 	public Response createOffer(Offer request) {
 		return created(() -> service.createOffer(request));
 	}
 
+	@PUT
+	@Path("/offers/{id}")
+	public Response updateOffer(@PathParam("id") Long id, Offer request) {
+		return okOrBadRequest(() -> service.updateOffer(id, request));
+	}
+
 	@GET
 	@Path("/offers")
-	public Response listOffers() {
-		return ok(service.listOffers());
+	public Response listOffers(@QueryParam("companyId") Long companyId) {
+		return ok(service.listOffers(companyId));
 	}
 
 	@POST
@@ -124,8 +187,8 @@ public class LeasingResource {
 
 	@GET
 	@Path("/reservations")
-	public Response listReservations() {
-		return ok(service.listReservations());
+	public Response listReservations(@QueryParam("companyId") Long companyId) {
+		return ok(service.listReservations(companyId));
 	}
 
 	@POST
@@ -205,6 +268,49 @@ public class LeasingResource {
 		JsonObject error = new JsonObject();
 		error.addProperty("message", message);
 		return GSON.toJson(error);
+	}
+
+	private Long loggedUserId(Long requestUserId) {
+		Long sessionUserId = userIdFromSession();
+		if (sessionUserId != null) {
+			return sessionUserId;
+		}
+		Long tokenUserId = userIdFromToken();
+		if (tokenUserId != null) {
+			return tokenUserId;
+		}
+		if (requestUserId != null) {
+			return requestUserId;
+		}
+		throw new IllegalArgumentException("Logged user is required");
+	}
+
+	private Long userIdFromSession() {
+		HttpSession session = httpRequest == null ? null : httpRequest.getSession(false);
+		if (session == null) {
+			return null;
+		}
+		return toUserId(session.getAttribute(CORE_USER_ID));
+	}
+
+	private Long userIdFromToken() {
+		String userId = tokenService.authenticatedUserId(httpRequest == null ? null : httpRequest.getHeader("Authorization"));
+		return toUserId(userId);
+	}
+
+	private Long toUserId(Object value) {
+		if (value instanceof Number number) {
+			return number.longValue();
+		}
+		if (value instanceof String text && !text.isBlank()) {
+			try {
+				return Long.valueOf(text);
+			}
+			catch (NumberFormatException ex) {
+				throw new IllegalArgumentException("Logged user id is invalid");
+			}
+		}
+		return null;
 	}
 
 	@FunctionalInterface

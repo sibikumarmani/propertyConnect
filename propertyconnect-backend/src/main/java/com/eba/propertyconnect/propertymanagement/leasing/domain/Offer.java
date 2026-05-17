@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 public class Offer extends AuditModel {
 
 	public Long id;
+	public Long companyId;
 	public Long prospectId;
 	public Long unitId;
 	public String offerNo;

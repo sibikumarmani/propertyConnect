@@ -6,6 +6,7 @@ import java.time.LocalDate;
 public class Requirement extends AuditModel {
 
 	public Long id;
+	public Long companyId;
 	public Long prospectId;
 	public Long propertyId;
 	public String propertyName;

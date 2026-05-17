@@ -14,7 +14,11 @@ public interface OfferMapper {
 
 	public Offer getOffer(Long id);
 
-	public List<Offer> listOffers();
+	public List<Offer> listOffers(@Param("companyId") Long companyId);
+
+	public List<Offer> listOffersByProspect(Long prospectId);
+
+	public int updateOffer(Offer offer);
 
 	public int updateOfferStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);
 }
