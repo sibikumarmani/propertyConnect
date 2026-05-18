@@ -5,6 +5,11 @@
 		<id column="id" property="id" jdbcType="BIGINT" />
 		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
+		<result column="requirement_level" property="requirementLevel" jdbcType="VARCHAR" />
+		<result column="block_name" property="blockName" jdbcType="VARCHAR" />
+		<result column="floor_name" property="floorName" jdbcType="VARCHAR" />
 		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
 		<result column="offer_no" property="offerNo" jdbcType="VARCHAR" />
 		<result column="base_amount" property="baseAmount" jdbcType="DECIMAL" />
@@ -13,10 +18,20 @@
 		<result column="special_terms" property="specialTerms" jdbcType="VARCHAR" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
 		<result column="approval_required" property="approvalRequired" jdbcType="BIT" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="createOffer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
-		INSERT INTO pa_txn_leasing_offer (company_id, prospect_id, unit_id, offer_no, base_amount, discount_amount, final_amount, special_terms, status, approval_required, created_by)
-		VALUES (#{companyId}, #{prospectId}, #{unitId}, #{offerNo}, #{baseAmount}, #{discountAmount}, #{finalAmount}, #{specialTerms}, #{status}, #{approvalRequired}, #{createdBy})
+		INSERT INTO pa_txn_leasing_offer (
+			company_id, prospect_id, property_id, property_name, requirement_level, block_name, floor_name, unit_id,
+			offer_no, base_amount, discount_amount, final_amount, special_terms, status, approval_required, created_by
+		)
+		VALUES (
+			#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{requirementLevel}, #{blockName}, #{floorName}, #{unitId},
+			#{offerNo}, #{baseAmount}, #{discountAmount}, #{finalAmount}, #{specialTerms}, #{status}, #{approvalRequired}, #{createdBy}
+		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getOffer" parameterType="long" resultMap="resultMapOffer">SELECT * FROM pa_txn_leasing_offer WHERE id = #{id}</select>
@@ -25,14 +40,19 @@
 		<where>
 			<if test="companyId != null">company_id = #{companyId}</if>
 		</where>
-		ORDER BY created_at DESC
+		ORDER BY created_on DESC
 	</select>
 	<select id="listOffersByProspect" parameterType="long" resultMap="resultMapOffer">
-		SELECT * FROM pa_txn_leasing_offer WHERE prospect_id = #{prospectId} ORDER BY created_at DESC
+		SELECT * FROM pa_txn_leasing_offer WHERE prospect_id = #{prospectId} ORDER BY created_on DESC
 	</select>
 	<update id="updateOffer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
 		UPDATE pa_txn_leasing_offer
 		SET company_id = #{companyId},
+			property_id = #{propertyId},
+			property_name = #{propertyName},
+			requirement_level = #{requirementLevel},
+			block_name = #{blockName},
+			floor_name = #{floorName},
 			unit_id = #{unitId},
 			base_amount = #{baseAmount},
 			discount_amount = #{discountAmount},

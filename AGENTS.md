@@ -17,7 +17,7 @@ This is the main instruction and index file for PropertyConnect. Keep this file 
 | Cache | Apache Commons JCS through `CacheHelper` |
 | Master table prefix | `pa_mst_*` |
 | Transaction table prefix | `pa_txn_*` |
-| Current leasing tables | `pa_mst_unit`, `pa_txn_leasing_*` |
+| Current leasing tables | `pa_mst_customer`, `pa_mst_unit`, `pa_txn_leasing_*` |
 
 ## Main Architecture
 
@@ -55,7 +55,7 @@ Do not create repository classes for the current backend style. Use MyBatis mapp
 
 ## Current Module
 
-The active business module is Customer Management: lead/prospect to reservation.
+The active business module is Customer Management: commercial customer lead to reservation.
 
 Current package:
 
@@ -95,17 +95,12 @@ Backend:
 
 Frontend:
 
-- [Frontend Design](FRONTEND-DESIGN.md)
 - [Layout Design](docs/frontend/layout-design.md)
 - [Component Patterns](docs/frontend/component-patterns.md)
 
 Customer Management:
 
-- [Lead To Reservation Process](docs/leasing/lead-to-reservation-process.md)
-- [Leasing Business Rules](docs/leasing/leasing-business-rules.md)
-- [Leasing API Endpoints](docs/leasing/leasing-api-endpoints.md)
-- [Leasing Database](docs/leasing/leasing-database.md)
-- [Leasing Status Flow](docs/leasing/leasing-status-flow.md)
+- [Leasing Module](docs/leasing/leasing.md)
 
 ## Verification
 

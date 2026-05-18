@@ -18,5 +18,7 @@ public interface ProspectMapper {
 
 	public int createProspect(Prospect prospect);
 
+	public int updateProspect(Prospect prospect);
+
 	public int updateProspectStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);
 }

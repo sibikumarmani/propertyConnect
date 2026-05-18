@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.leasing.mapper.CustomerMapper">
+	<resultMap id="resultMapCustomer" type="com.eba.propertyconnect.propertymanagement.leasing.domain.Customer">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
+		<result column="customer_code" property="customerCode" jdbcType="VARCHAR" />
+		<result column="customer_type" property="customerType" jdbcType="VARCHAR" />
+		<result column="customer_name" property="customerName" jdbcType="VARCHAR" />
+		<result column="trade_license_no" property="tradeLicenseNo" jdbcType="VARCHAR" />
+		<result column="cr_number" property="crNumber" jdbcType="VARCHAR" />
+		<result column="vat_registration_no" property="vatRegistrationNo" jdbcType="VARCHAR" />
+		<result column="contact_person" property="contactPerson" jdbcType="VARCHAR" />
+		<result column="contact_role" property="contactRole" jdbcType="VARCHAR" />
+		<result column="contact_title" property="contactTitle" jdbcType="VARCHAR" />
+		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
+		<result column="phone_no" property="phoneNo" jdbcType="VARCHAR" />
+		<result column="email" property="email" jdbcType="VARCHAR" />
+		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="VARCHAR" />
+		<result column="fax_no" property="faxNo" jdbcType="VARCHAR" />
+		<result column="address" property="address" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+	<select id="getCustomer" parameterType="long" resultMap="resultMapCustomer">
+		SELECT * FROM pa_mst_customer WHERE id = #{id}
+	</select>
+	<insert id="createCustomer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Customer">
+		INSERT INTO pa_mst_customer (
+			company_id, customer_code, customer_type, customer_name, trade_license_no, cr_number, vat_registration_no,
+			contact_person, contact_role, contact_title, mobile_no, phone_no, email, preferred_contact_method, fax_no, address, status, created_by
+		)
+		VALUES (
+			#{companyId}, #{customerCode}, #{customerType}, #{customerName}, #{tradeLicenseNo}, #{crNumber}, #{vatRegistrationNo},
+			#{contactPerson}, #{contactRole}, #{contactTitle}, #{mobileNo}, #{phoneNo}, #{email}, #{preferredContactMethod}, #{faxNo}, #{address}, #{status}, #{createdBy}
+		)
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<select id="searchCustomers" resultMap="resultMapCustomer">
+		SELECT *
+		FROM pa_mst_customer
+		<where>
+			<if test="companyId != null">company_id = #{companyId}</if>
+			<if test="search != null and search != ''">
+				<if test="companyId != null">AND</if>
+				(
+					LOWER(customer_name) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(customer_code) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(mobile_no) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(phone_no) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(email) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(vat_registration_no) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(trade_license_no) LIKE CONCAT('%', LOWER(#{search}), '%')
+					OR LOWER(cr_number) LIKE CONCAT('%', LOWER(#{search}), '%')
+				)
+			</if>
+		</where>
+		ORDER BY customer_name ASC
+		LIMIT 25
+	</select>
+</mapper>

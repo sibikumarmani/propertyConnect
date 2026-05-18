@@ -5,7 +5,7 @@ import java.util.Date;
 public class AuditModel {
 
 	public Long createdBy;
-	public Date createdAt;
+	public Date createdOn;
 	public Long updatedBy;
-	public Date updatedAt;
+	public Date updatedOn;
 }

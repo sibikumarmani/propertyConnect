@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  ClipboardList,
   FileText,
   LayoutDashboard,
   Scale,
@@ -38,6 +39,7 @@ export const navigationGroups: NavigationGroup[] = [
       { href: "/propertyconnect/customer-management/customer-dashboard", label: "Customer Dashboard", icon: UsersRound },
       { href: "/propertyconnect/customer-management/leads", label: "Lead", icon: UserPlus },
       { href: "/propertyconnect/customer-management/prospects", label: "Prospect", icon: UserCheck },
+      { href: "/propertyconnect/customer-management/reservations", label: "Reservation", icon: ClipboardList },
       { href: "/propertyconnect/customer-management/reports", label: "Reports", icon: BarChart3 },
     ],
   },

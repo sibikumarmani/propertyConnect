@@ -7,10 +7,13 @@ import com.eba.propertyconnect.propertymanagement.leasing.domain.ApprovalRequest
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Lead;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Offer;
+import com.eba.propertyconnect.propertymanagement.leasing.domain.OfferStatusRequest;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.PaymentReceipt;
+import com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.QualificationRequest;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation;
+import com.eba.propertyconnect.propertymanagement.leasing.domain.ReservationStatusRequest;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Unit;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.UnitSearch;
@@ -57,6 +60,12 @@ public class LeasingResource {
 	private HttpServletRequest httpRequest;
 
 	@GET
+	@Path("/customers")
+	public Response searchCustomers(@QueryParam("companyId") Long companyId, @QueryParam("search") String search) {
+		return ok(service.searchCustomers(companyId, search));
+	}
+
+	@GET
 	@Path("/leads")
 	public Response listLeads(@QueryParam("companyId") Long companyId) {
 		return ok(service.listLeads(companyId));
@@ -85,8 +94,8 @@ public class LeasingResource {
 
 	@POST
 	@Path("/leads/{id}/convert-to-prospect")
-	public Response convertLead(@PathParam("id") Long id, @QueryParam("createdBy") Long createdBy) {
-		return okOrBadRequest(() -> service.convertLeadToProspect(id, createdBy));
+	public Response convertLead(@PathParam("id") Long id, @QueryParam("createdBy") Long createdBy, Prospect request) {
+		return okOrBadRequest(() -> service.convertLeadToProspect(id, createdBy, request));
 	}
 
 	@GET
@@ -99,6 +108,12 @@ public class LeasingResource {
 	@Path("/prospects/{id}")
 	public Response getProspect(@PathParam("id") Long id) {
 		return okOrBadRequest(() -> service.getProspect(id));
+	}
+
+	@PUT
+	@Path("/prospects/{id}")
+	public Response updateProspect(@PathParam("id") Long id, Prospect request) {
+		return okOrBadRequest(() -> service.updateProspect(id, request));
 	}
 
 	@GET
@@ -173,6 +188,18 @@ public class LeasingResource {
 		return okOrBadRequest(() -> service.updateOffer(id, request));
 	}
 
+	@POST
+	@Path("/offers/{id}/approval")
+	public Response approveOffer(@PathParam("id") Long id, ApprovalRequest request) {
+		return okOrBadRequest(() -> service.approveOffer(id, request));
+	}
+
+	@POST
+	@Path("/offers/{id}/status")
+	public Response updateOfferStatus(@PathParam("id") Long id, OfferStatusRequest request) {
+		return okOrBadRequest(() -> service.updateOfferStatus(id, request));
+	}
+
 	@GET
 	@Path("/offers")
 	public Response listOffers(@QueryParam("companyId") Long companyId) {
@@ -197,10 +224,22 @@ public class LeasingResource {
 		return created(() -> service.createReservationRequest(request));
 	}
 
+	@PUT
+	@Path("/reservations/{id}")
+	public Response updateReservation(@PathParam("id") Long id, Reservation request) {
+		return okOrBadRequest(() -> service.updateReservation(id, request));
+	}
+
 	@POST
 	@Path("/reservations/{id}/approval")
 	public Response approveReservation(@PathParam("id") Long id, ApprovalRequest request) {
 		return okOrBadRequest(() -> service.approveReservation(id, request));
+	}
+
+	@POST
+	@Path("/reservations/{id}/status")
+	public Response updateReservationStatus(@PathParam("id") Long id, ReservationStatusRequest request) {
+		return okOrBadRequest(() -> service.updateReservationStatus(id, request));
 	}
 
 	@POST
@@ -260,6 +299,9 @@ public class LeasingResource {
 			return Response.status(Response.Status.BAD_REQUEST).entity(error(ex.getMessage())).build();
 		}
 		catch (IllegalStateException ex) {
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(error(ex.getMessage())).build();
+		}
+		catch (Exception ex) {
 			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(error(ex.getMessage())).build();
 		}
 	}

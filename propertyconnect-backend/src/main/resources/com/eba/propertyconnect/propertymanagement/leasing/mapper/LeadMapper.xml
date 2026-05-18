@@ -5,39 +5,53 @@
 		<id column="id" property="id" jdbcType="BIGINT" />
 		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="lead_no" property="leadNo" jdbcType="VARCHAR" />
+		<result column="customer_id" property="customerId" jdbcType="BIGINT" />
+		<result column="customer_code" property="customerCode" jdbcType="VARCHAR" />
+		<result column="customer_type" property="customerType" jdbcType="VARCHAR" />
 		<result column="customer_name" property="customerName" jdbcType="VARCHAR" />
+		<result column="contact_person" property="contactPerson" jdbcType="VARCHAR" />
 		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
 		<result column="email" property="email" jdbcType="VARCHAR" />
-		<result column="source" property="source" jdbcType="VARCHAR" />
+		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="VARCHAR" />
 		<result column="purpose" property="purpose" jdbcType="VARCHAR" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
 		<result column="qualification_score" property="qualificationScore" jdbcType="INTEGER" />
 		<result column="qualification_notes" property="qualificationNotes" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
-		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<select id="listLeads" resultMap="resultMapLead">
 		SELECT * FROM pa_txn_leasing_lead
 		<where>
 			<if test="companyId != null">company_id = #{companyId}</if>
 		</where>
-		ORDER BY created_at DESC
+		ORDER BY created_on DESC
 	</select>
 	<select id="getLead" parameterType="long" resultMap="resultMapLead">SELECT * FROM pa_txn_leasing_lead WHERE id = #{id, jdbcType=BIGINT}</select>
 	<insert id="createLead" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Lead">
-		INSERT INTO pa_txn_leasing_lead (company_id, lead_no, customer_name, mobile_no, email, source, purpose, status, created_by)
-		VALUES (#{companyId}, #{leadNo}, #{customerName}, #{mobileNo}, #{email}, #{source}, #{purpose}, #{status}, #{createdBy})
+		INSERT INTO pa_txn_leasing_lead (
+			company_id, lead_no, customer_id, customer_code, customer_type, customer_name, contact_person,
+			mobile_no, email, preferred_contact_method, purpose, status, created_by
+		)
+		VALUES (
+			#{companyId}, #{leadNo}, #{customerId}, #{customerCode}, #{customerType}, #{customerName}, #{contactPerson},
+			#{mobileNo}, #{email}, #{preferredContactMethod}, #{purpose}, #{status}, #{createdBy}
+		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<update id="updateLead" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Lead">
 		UPDATE pa_txn_leasing_lead
 		SET company_id = #{companyId},
+			customer_id = #{customerId},
+			customer_code = #{customerCode},
+			customer_type = #{customerType},
 			customer_name = #{customerName},
+			contact_person = #{contactPerson},
 			mobile_no = #{mobileNo},
 			email = #{email},
-			source = #{source},
+			preferred_contact_method = #{preferredContactMethod},
 			purpose = #{purpose},
 			updated_by = #{updatedBy}
 		WHERE id = #{id}

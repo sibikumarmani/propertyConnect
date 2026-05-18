@@ -8,6 +8,8 @@
 		<result column="proposed_amount" property="proposedAmount" jdbcType="DECIMAL" />
 		<result column="notes" property="notes" jdbcType="VARCHAR" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="createNegotiation" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation">
 		INSERT INTO pa_txn_leasing_negotiation (company_id, offer_id, proposed_amount, notes, status, created_by)

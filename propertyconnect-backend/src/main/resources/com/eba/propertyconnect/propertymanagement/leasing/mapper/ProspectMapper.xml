@@ -6,28 +6,77 @@
 		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="lead_id" property="leadId" jdbcType="BIGINT" />
 		<result column="prospect_no" property="prospectNo" jdbcType="VARCHAR" />
+		<result column="customer_id" property="customerId" jdbcType="BIGINT" />
+		<result column="customer_code" property="customerCode" jdbcType="VARCHAR" />
+		<result column="customer_type" property="customerType" jdbcType="VARCHAR" />
 		<result column="customer_name" property="customerName" jdbcType="VARCHAR" />
+		<result column="trade_license_no" property="tradeLicenseNo" jdbcType="VARCHAR" />
+		<result column="cr_number" property="crNumber" jdbcType="VARCHAR" />
+		<result column="vat_registration_no" property="vatRegistrationNo" jdbcType="VARCHAR" />
+		<result column="contact_person" property="contactPerson" jdbcType="VARCHAR" />
+		<result column="contact_role" property="contactRole" jdbcType="VARCHAR" />
+		<result column="contact_title" property="contactTitle" jdbcType="VARCHAR" />
 		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
+		<result column="phone_no" property="phoneNo" jdbcType="VARCHAR" />
 		<result column="email" property="email" jdbcType="VARCHAR" />
+		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="VARCHAR" />
+		<result column="fax_no" property="faxNo" jdbcType="VARCHAR" />
+		<result column="address" property="address" jdbcType="VARCHAR" />
+		<result column="source" property="source" jdbcType="VARCHAR" />
+		<result column="purpose" property="purpose" jdbcType="VARCHAR" />
+		<result column="commercial_need" property="commercialNeed" jdbcType="VARCHAR" />
+		<result column="document_notes" property="documentNotes" jdbcType="VARCHAR" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
-		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<select id="listProspects" resultMap="resultMapProspect">
 		SELECT * FROM pa_txn_leasing_prospect
 		<where>
 			<if test="companyId != null">company_id = #{companyId}</if>
 		</where>
-		ORDER BY created_at DESC
+		ORDER BY created_on DESC
 	</select>
 	<select id="getProspect" parameterType="long" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect WHERE id = #{id}</select>
 	<select id="getProspectByLead" parameterType="long" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect WHERE lead_id = #{leadId}</select>
 	<insert id="createProspect" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect">
-		INSERT INTO pa_txn_leasing_prospect (company_id, lead_id, prospect_no, customer_name, mobile_no, email, status, created_by)
-		VALUES (#{companyId}, #{leadId}, #{prospectNo}, #{customerName}, #{mobileNo}, #{email}, #{status}, #{createdBy})
+		INSERT INTO pa_txn_leasing_prospect (
+			company_id, lead_id, prospect_no, customer_id, customer_code, customer_type, customer_name, trade_license_no, cr_number, vat_registration_no,
+			contact_person, contact_role, contact_title, mobile_no, phone_no, email, preferred_contact_method, fax_no, address, source, purpose,
+			commercial_need, document_notes, status, created_by
+		)
+		VALUES (
+			#{companyId}, #{leadId}, #{prospectNo}, #{customerId}, #{customerCode}, #{customerType}, #{customerName}, #{tradeLicenseNo}, #{crNumber}, #{vatRegistrationNo},
+			#{contactPerson}, #{contactRole}, #{contactTitle}, #{mobileNo}, #{phoneNo}, #{email}, #{preferredContactMethod}, #{faxNo}, #{address}, #{source}, #{purpose},
+			#{commercialNeed}, #{documentNotes}, #{status}, #{createdBy}
+		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
+	<update id="updateProspect" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect">
+		UPDATE pa_txn_leasing_prospect
+		SET
+			customer_type = #{customerType},
+			customer_name = #{customerName},
+			trade_license_no = #{tradeLicenseNo},
+			cr_number = #{crNumber},
+			vat_registration_no = #{vatRegistrationNo},
+			contact_person = #{contactPerson},
+			contact_role = #{contactRole},
+			contact_title = #{contactTitle},
+			mobile_no = #{mobileNo},
+			phone_no = #{phoneNo},
+			email = #{email},
+			preferred_contact_method = #{preferredContactMethod},
+			fax_no = #{faxNo},
+			address = #{address},
+			source = #{source},
+			purpose = #{purpose},
+			commercial_need = #{commercialNeed},
+			document_notes = #{documentNotes},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
 	<update id="updateProspectStatus">UPDATE pa_txn_leasing_prospect SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 </mapper>

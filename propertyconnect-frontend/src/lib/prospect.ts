@@ -8,12 +8,31 @@ export type Prospect = {
   companyId?: number;
   leadId?: number;
   prospectNo?: string;
+  customerId?: number;
+  customerCode?: string;
+  customerType?: string;
   customerName: string;
+  tradeLicenseNo?: string;
+  crNumber?: string;
+  vatRegistrationNo?: string;
+  contactPerson?: string;
+  contactRole?: string;
+  contactTitle?: string;
   mobileNo: string;
+  phoneNo?: string;
   email?: string;
+  preferredContactMethod?: string;
+  faxNo?: string;
+  address?: string;
+  source?: string;
+  purpose?: string;
+  commercialNeed?: string;
+  documentNotes?: string;
   status?: string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type ProspectRequirement = {
@@ -22,32 +41,57 @@ export type ProspectRequirement = {
   prospectId?: number;
   propertyId?: number;
   propertyName?: string;
+  requirementLevel?: string;
+  blockName?: string;
+  floorName?: string;
+  preferredUnitId?: number;
   unitType?: string;
   bedrooms?: number;
+  areaFrom?: number;
+  areaTo?: number;
   budgetFrom?: number;
   budgetTo?: number;
   moveInDate?: string;
+  leaseTermMonths?: number;
+  usageType?: string;
+  parkingRequired?: boolean;
+  fitOutRequired?: boolean;
+  specialRequirements?: string;
   notes?: string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type ProspectSiteVisit = {
   id?: number;
   companyId?: number;
   prospectId?: number;
+  propertyId?: number;
+  propertyName?: string;
+  requirementLevel?: string;
+  blockName?: string;
+  floorName?: string;
   unitId?: number;
   visitAt?: string;
   status?: string;
   notes?: string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type ProspectOffer = {
   id?: number;
   companyId?: number;
   prospectId?: number;
+  propertyId?: number;
+  propertyName?: string;
+  requirementLevel?: string;
+  blockName?: string;
+  floorName?: string;
   unitId?: number;
   offerNo?: string;
   baseAmount?: number;
@@ -57,7 +101,9 @@ export type ProspectOffer = {
   status?: string;
   approvalRequired?: boolean;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type ProspectNegotiation = {
@@ -68,6 +114,7 @@ export type ProspectNegotiation = {
   notes?: string;
   status?: string;
   createdBy?: number;
+  createdOn?: string;
 };
 
 export type ProspectReservation = {
@@ -86,7 +133,9 @@ export type ProspectReservation = {
   paymentWaived?: boolean;
   expiresAt?: string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type Reservation = ProspectReservation;
@@ -100,6 +149,7 @@ export type ProspectPaymentReceipt = {
   paidAt?: string;
   erpReceiptId?: number;
   createdBy?: number;
+  createdOn?: string;
 };
 
 export async function listProspects() {
@@ -109,6 +159,10 @@ export async function listProspects() {
 
 export async function getProspect(id: number) {
   return request<Prospect>(`/prospects/${id}`);
+}
+
+export async function updateProspect(id: number, payload: Prospect) {
+  return request<Prospect>(`/prospects/${id}`, { method: "PUT", body: withUpdatedBy(payload) });
 }
 
 export async function listProspectRequirements(prospectId: number) {
@@ -140,12 +194,25 @@ export async function listReservations() {
   return request<Reservation[]>(`/reservations${companyId ? `?companyId=${companyId}` : ""}`);
 }
 
+export async function listOffers() {
+  const companyId = selectedCompanyId();
+  return request<ProspectOffer[]>(`/offers${companyId ? `?companyId=${companyId}` : ""}`);
+}
+
 export async function saveProspectOffer(payload: ProspectOffer) {
   return request<ProspectOffer>("/offers", { method: "POST", body: withCreatedBy(payload) });
 }
 
 export async function updateProspectOffer(id: number, payload: ProspectOffer) {
   return request<ProspectOffer>(`/offers/${id}`, { method: "PUT", body: withUpdatedBy(payload) });
+}
+
+export async function approveProspectOffer(id: number, payload: { approved: boolean; comments?: string; approvedBy?: number }) {
+  return request<ProspectOffer>(`/offers/${id}/approval`, { method: "POST", body: { ...payload, approvedBy: payload.approvedBy ?? loggedUserId() } });
+}
+
+export async function updateProspectOfferStatus(id: number, payload: { status: string; comments?: string; updatedBy?: number }) {
+  return request<ProspectOffer>(`/offers/${id}/status`, { method: "POST", body: { ...payload, updatedBy: payload.updatedBy ?? loggedUserId() } });
 }
 
 export async function saveProspectNegotiation(payload: ProspectNegotiation) {
@@ -156,8 +223,16 @@ export async function saveProspectReservation(payload: ProspectReservation) {
   return request<ProspectReservation>("/reservations", { method: "POST", body: normalizeDateTime(withCreatedBy(payload)) });
 }
 
+export async function updateProspectReservation(id: number, payload: ProspectReservation) {
+  return request<ProspectReservation>(`/reservations/${id}`, { method: "PUT", body: normalizeDateTime(withUpdatedBy(payload)) });
+}
+
 export async function approveProspectReservation(id: number, payload: { approved: boolean; comments?: string; approvedBy?: number }) {
   return request<ProspectReservation>(`/reservations/${id}/approval`, { method: "POST", body: { ...payload, approvedBy: payload.approvedBy ?? loggedUserId() } });
+}
+
+export async function updateProspectReservationStatus(id: number, payload: { status: string; comments?: string; updatedBy?: number }) {
+  return request<ProspectReservation>(`/reservations/${id}/status`, { method: "POST", body: { ...payload, updatedBy: payload.updatedBy ?? loggedUserId() } });
 }
 
 export async function recordProspectReservationPayment(id: number, payload: ProspectPaymentReceipt) {

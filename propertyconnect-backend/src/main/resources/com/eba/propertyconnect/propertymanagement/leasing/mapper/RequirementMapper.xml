@@ -7,36 +7,66 @@
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
 		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
+		<result column="requirement_level" property="requirementLevel" jdbcType="VARCHAR" />
+		<result column="block_name" property="blockName" jdbcType="VARCHAR" />
+		<result column="floor_name" property="floorName" jdbcType="VARCHAR" />
+		<result column="preferred_unit_id" property="preferredUnitId" jdbcType="BIGINT" />
 		<result column="unit_type" property="unitType" jdbcType="VARCHAR" />
 		<result column="bedrooms" property="bedrooms" jdbcType="INTEGER" />
+		<result column="area_from" property="areaFrom" jdbcType="DECIMAL" />
+		<result column="area_to" property="areaTo" jdbcType="DECIMAL" />
 		<result column="budget_from" property="budgetFrom" jdbcType="DECIMAL" />
 		<result column="budget_to" property="budgetTo" jdbcType="DECIMAL" />
 		<result column="move_in_date" property="moveInDate" jdbcType="DATE" />
+		<result column="lease_term_months" property="leaseTermMonths" jdbcType="INTEGER" />
+		<result column="usage_type" property="usageType" jdbcType="VARCHAR" />
+		<result column="parking_required" property="parkingRequired" jdbcType="BIT" />
+		<result column="fit_out_required" property="fitOutRequired" jdbcType="BIT" />
+		<result column="special_requirements" property="specialRequirements" jdbcType="VARCHAR" />
 		<result column="notes" property="notes" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
-		<result column="updated_at" property="updatedAt" jdbcType="TIMESTAMP" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="saveRequirement" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement">
-		INSERT INTO pa_txn_leasing_requirement (company_id, prospect_id, property_id, property_name, unit_type, bedrooms, budget_from, budget_to, move_in_date, notes, created_by)
-		VALUES (#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{unitType}, #{bedrooms}, #{budgetFrom}, #{budgetTo}, #{moveInDate}, #{notes}, #{createdBy})
+		INSERT INTO pa_txn_leasing_requirement (
+			company_id, prospect_id, property_id, property_name, requirement_level, block_name, floor_name, preferred_unit_id,
+			unit_type, bedrooms, area_from, area_to, budget_from, budget_to, move_in_date, lease_term_months,
+			usage_type, parking_required, fit_out_required, special_requirements, notes, created_by
+		)
+		VALUES (
+			#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{requirementLevel}, #{blockName}, #{floorName}, #{preferredUnitId},
+			#{unitType}, #{bedrooms}, #{areaFrom}, #{areaTo}, #{budgetFrom}, #{budgetTo}, #{moveInDate}, #{leaseTermMonths},
+			#{usageType}, #{parkingRequired}, #{fitOutRequired}, #{specialRequirements}, #{notes}, #{createdBy}
+		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getRequirement" parameterType="long" resultMap="resultMapRequirement">SELECT * FROM pa_txn_leasing_requirement WHERE id = #{id}</select>
 	<select id="listRequirementsByProspect" parameterType="long" resultMap="resultMapRequirement">
-		SELECT * FROM pa_txn_leasing_requirement WHERE prospect_id = #{prospectId} ORDER BY created_at DESC
+		SELECT * FROM pa_txn_leasing_requirement WHERE prospect_id = #{prospectId} ORDER BY created_on DESC
 	</select>
 	<update id="updateRequirement" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement">
 		UPDATE pa_txn_leasing_requirement
 		SET company_id = #{companyId},
 			property_id = #{propertyId},
 			property_name = #{propertyName},
+			requirement_level = #{requirementLevel},
+			block_name = #{blockName},
+			floor_name = #{floorName},
+			preferred_unit_id = #{preferredUnitId},
 			unit_type = #{unitType},
 			bedrooms = #{bedrooms},
+			area_from = #{areaFrom},
+			area_to = #{areaTo},
 			budget_from = #{budgetFrom},
 			budget_to = #{budgetTo},
 			move_in_date = #{moveInDate},
+			lease_term_months = #{leaseTermMonths},
+			usage_type = #{usageType},
+			parking_required = #{parkingRequired},
+			fit_out_required = #{fitOutRequired},
+			special_requirements = #{specialRequirements},
 			notes = #{notes},
 			updated_by = #{updatedBy}
 		WHERE id = #{id}

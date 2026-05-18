@@ -10,6 +10,10 @@
 		<result column="bedrooms" property="bedrooms" jdbcType="INTEGER" />
 		<result column="asking_rent" property="askingRent" jdbcType="DECIMAL" />
 		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="createUnit" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Unit">
 		INSERT INTO pa_mst_unit (property_id, property_name, unit_code, unit_type, bedrooms, asking_rent, status, created_by)

@@ -9,6 +9,8 @@
 		<result column="payment_method" property="paymentMethod" jdbcType="VARCHAR" />
 		<result column="paid_at" property="paidAt" jdbcType="TIMESTAMP" />
 		<result column="erp_receipt_id" property="erpReceiptId" jdbcType="BIGINT" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="createPaymentReceipt" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.PaymentReceipt">
 		INSERT INTO pa_txn_leasing_payment_receipt (reservation_id, receipt_no, amount, payment_method, paid_at, erp_receipt_id, created_by)

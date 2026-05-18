@@ -7,15 +7,47 @@ export type Lead = {
   id?: number;
   companyId?: number;
   leadNo?: string;
+  customerId?: number;
+  customerCode?: string;
+  customerType?: string;
   customerName: string;
+  contactPerson?: string;
   mobileNo: string;
   email?: string;
-  source?: string;
+  preferredContactMethod?: string;
   purpose?: string;
   status?: string;
   qualificationScore?: number;
   qualificationNotes?: string;
   createdBy?: number;
+  createdOn?: string;
+  updatedBy?: number;
+  updatedOn?: string;
+};
+
+export type CustomerMaster = {
+  id: number;
+  companyId?: number;
+  customerCode?: string;
+  customerType?: string;
+  customerName: string;
+  tradeLicenseNo?: string;
+  crNumber?: string;
+  vatRegistrationNo?: string;
+  contactPerson?: string;
+  contactRole?: string;
+  contactTitle?: string;
+  mobileNo?: string;
+  phoneNo?: string;
+  email?: string;
+  preferredContactMethod?: string;
+  faxNo?: string;
+  address?: string;
+  status?: string;
+  createdBy?: number;
+  createdOn?: string;
+  updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type LeadStageTarget = "QUALIFIED" | "CONVERTED_TO_PROSPECT";
@@ -23,6 +55,19 @@ export type LeadStageTarget = "QUALIFIED" | "CONVERTED_TO_PROSPECT";
 export async function listLeads() {
   const companyId = selectedCompanyId();
   return request<Lead[]>(`/leads${companyId ? `?companyId=${companyId}` : ""}`);
+}
+
+export async function searchCustomers(search: string) {
+  const companyId = selectedCompanyId();
+  const params = new URLSearchParams();
+  if (companyId) {
+    params.set("companyId", String(companyId));
+  }
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  const query = params.toString();
+  return request<CustomerMaster[]>(`/customers${query ? `?${query}` : ""}`);
 }
 
 export async function createLead(payload: Lead) {
@@ -37,9 +82,9 @@ export async function qualifyLead(id: number, payload: { score: number; notes?: 
   return request<Lead>(`/leads/${id}/qualify`, { method: "POST", body: payload });
 }
 
-export async function convertLeadToProspect<T>(id: number, createdBy?: number) {
+export async function convertLeadToProspect<T>(id: number, createdBy?: number, payload?: unknown) {
   const userId = createdBy ?? loggedUserId();
-  return request<T>(`/leads/${id}/convert-to-prospect${userId ? `?createdBy=${userId}` : ""}`, { method: "POST" });
+  return request<T>(`/leads/${id}/convert-to-prospect${userId ? `?createdBy=${userId}` : ""}`, { method: "POST", body: payload });
 }
 
 async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {

@@ -24,6 +24,10 @@ export type LegalCardAttachment = {
   documentTypeId: number;
   documentType?: string;
   fileName: string;
+  createdBy?: number;
+  createdOn?: string;
+  updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type LegalCardTimeline = {
@@ -36,6 +40,10 @@ export type LegalCardTimeline = {
   remarks?: string;
   actor?: string;
   timestamp?: string;
+  createdBy?: number;
+  createdOn?: string;
+  updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type LegalCard = {
@@ -68,7 +76,9 @@ export type LegalCard = {
   dueAmount: number | string;
   comments?: string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
   attachments?: LegalCardAttachment[];
   timeline?: LegalCardTimeline[];
 };

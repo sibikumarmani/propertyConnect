@@ -15,6 +15,8 @@ public interface ReservationMapper {
 
 	public Reservation getReservation(Long id);
 
+	public int updateReservation(Reservation reservation);
+
 	public List<Reservation> listReservations(@Param("companyId") Long companyId);
 
 	public List<Reservation> listReservationsByProspect(Long prospectId);

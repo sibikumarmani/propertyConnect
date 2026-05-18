@@ -1,12 +1,9 @@
 package com.eba.propertyconnect.propertymanagement.leasing.domain;
 
-public class Prospect extends AuditModel {
+public class Customer extends AuditModel {
 
 	public Long id;
 	public Long companyId;
-	public Long leadId;
-	public String prospectNo;
-	public Long customerId;
 	public String customerCode;
 	public String customerType;
 	public String customerName;
@@ -22,9 +19,5 @@ public class Prospect extends AuditModel {
 	public String preferredContactMethod;
 	public String faxNo;
 	public String address;
-	public String source;
-	public String purpose;
-	public String commercialNeed;
-	public String documentNotes;
 	public String status;
 }

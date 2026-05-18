@@ -16,6 +16,10 @@
 		<result column="paid_amount" property="paidAmount" jdbcType="DECIMAL" />
 		<result column="payment_waived" property="paymentWaived" jdbcType="BIT" />
 		<result column="expires_at" property="expiresAt" jdbcType="TIMESTAMP" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<insert id="createReservation" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation">
 		INSERT INTO pa_txn_leasing_reservation (
@@ -27,22 +31,37 @@
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<select id="getReservation" parameterType="long" resultMap="resultMapReservation">SELECT * FROM pa_txn_leasing_reservation WHERE id = #{id}</select>
+	<update id="updateReservation" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation">
+		UPDATE pa_txn_leasing_reservation
+		SET lead_id = #{leadId},
+			prospect_id = #{prospectId},
+			offer_id = #{offerId},
+			property_id = #{propertyId},
+			unit_id = #{unitId},
+			status = #{status},
+			approval_status = #{approvalStatus},
+			reservation_fee = #{reservationFee},
+			payment_waived = #{paymentWaived},
+			expires_at = #{expiresAt},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
 	<select id="listReservations" resultMap="resultMapReservation">
 		SELECT * FROM pa_txn_leasing_reservation
 		<where>
 			<if test="companyId != null">company_id = #{companyId}</if>
 		</where>
-		ORDER BY created_at DESC
+		ORDER BY created_on DESC
 	</select>
 	<select id="listReservationsByProspect" parameterType="long" resultMap="resultMapReservation">
-		SELECT * FROM pa_txn_leasing_reservation WHERE prospect_id = #{prospectId} ORDER BY created_at DESC
+		SELECT * FROM pa_txn_leasing_reservation WHERE prospect_id = #{prospectId} ORDER BY created_on DESC
 	</select>
 	<update id="updateReservationApproval">UPDATE pa_txn_leasing_reservation SET status = #{status}, approval_status = #{approvalStatus}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 	<update id="updateReservationStatus">UPDATE pa_txn_leasing_reservation SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
-	<update id="addReservationPayment">UPDATE pa_txn_leasing_reservation SET paid_amount = paid_amount + #{amount}, status = 'APPROVED', updated_by = #{updatedBy} WHERE id = #{id}</update>
+	<update id="addReservationPayment">UPDATE pa_txn_leasing_reservation SET paid_amount = paid_amount + #{amount}, status = 'PAID', updated_by = #{updatedBy} WHERE id = #{id}</update>
 	<select id="hasActiveReservation" parameterType="long" resultType="boolean">
 		SELECT COUNT(*) > 0 FROM pa_txn_leasing_reservation
 		WHERE unit_id = #{unitId}
-		AND status IN ('REQUESTED', 'PENDING_APPROVAL', 'APPROVED', 'PAYMENT_PENDING', 'CONFIRMED')
+		AND status IN ('PENDING_APPROVAL', 'PAYMENT_PENDING', 'PAID', 'CONFIRMED')
 	</select>
 </mapper>
