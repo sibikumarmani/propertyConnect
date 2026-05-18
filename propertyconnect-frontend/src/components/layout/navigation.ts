@@ -1,5 +1,8 @@
 import {
   BarChart3,
+  FileText,
+  LayoutDashboard,
+  Scale,
   UserCheck,
   UserPlus,
   UsersRound,
@@ -36,6 +39,14 @@ export const navigationGroups: NavigationGroup[] = [
       { href: "/propertyconnect/customer-management/leads", label: "Lead", icon: UserPlus },
       { href: "/propertyconnect/customer-management/prospects", label: "Prospect", icon: UserCheck },
       { href: "/propertyconnect/customer-management/reports", label: "Reports", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Legal Management",
+    icon: Scale,
+    items: [
+      { href: "/propertyconnect/legal-management/dashboard", label: "Legal Dashboard", icon: LayoutDashboard },
+      { href: "/propertyconnect/legal-management/legal-card", label: "Legal Card", icon: FileText },
     ],
   },
 ];
