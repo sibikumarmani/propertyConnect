@@ -14,7 +14,7 @@
 		<result column="active_from" property="activeFrom" jdbcType="TIMESTAMP" />
 		<result column="active_to" property="activeTo" jdbcType="TIMESTAMP" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
 		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
@@ -23,7 +23,7 @@
 		SELECT * FROM ${tableName}
 		<trim prefix="WHERE" prefixOverrides="AND|OR">
 			<if test="companyId != null">AND company_id = #{companyId}</if>
-			<if test="!includeInactive">AND active_status = 'ACTIVE'</if>
+			<if test="!includeInactive">AND active_status = 'Y'</if>
 		</trim>
 		ORDER BY sort_order, name
 	</select>
@@ -87,16 +87,16 @@
 			updated_by = #{record.updatedBy},
 			updated_on = CURRENT_TIMESTAMP
 		WHERE id = #{record.id}
-		  AND active_status = 'ACTIVE'
+		  AND active_status = 'Y'
 	</update>
 
 	<update id="deactivate">
 		UPDATE ${tableName}
-		SET active_status = 'INACTIVE',
+		SET active_status = 'N',
 			active_to = CURRENT_TIMESTAMP,
 			updated_by = #{updatedBy},
 			updated_on = CURRENT_TIMESTAMP
 		WHERE id = #{id}
-		  AND active_status = 'ACTIVE'
+		  AND active_status = 'Y'
 	</update>
 </mapper>

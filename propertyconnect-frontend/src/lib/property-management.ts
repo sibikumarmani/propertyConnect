@@ -13,9 +13,11 @@ export type MasterRecord = {
   sortOrder?: number;
   attributes?: string;
   status?: string;
-  activeStatus?: "ACTIVE" | "INACTIVE" | string;
+  activeStatus?: "Y" | "N" | string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type PropertyMaster = {
@@ -49,9 +51,11 @@ export type PropertyMaster = {
   operatingModel?: string;
   facilityManager?: string;
   onboardingStatus?: string;
-  activeStatus?: string;
+  activeStatus?: "Y" | "N" | string;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type PropertyOwnershipRow = {
@@ -64,7 +68,9 @@ export type PropertyOwnershipRow = {
   status?: string;
   sortOrder?: number;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type PropertyDocumentRow = {
@@ -77,7 +83,9 @@ export type PropertyDocumentRow = {
   status?: string;
   sortOrder?: number;
   createdBy?: number;
+  createdOn?: string;
   updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type WorkflowRow = {

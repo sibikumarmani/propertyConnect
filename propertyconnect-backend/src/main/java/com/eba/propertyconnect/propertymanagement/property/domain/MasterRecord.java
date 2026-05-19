@@ -17,7 +17,7 @@ public class MasterRecord {
 	public Date activeFrom;
 	public Date activeTo;
 	public Long createdBy;
-	public Date createdAt;
+	public Date createdOn;
 	public Long updatedBy;
 	public Date updatedOn;
 }

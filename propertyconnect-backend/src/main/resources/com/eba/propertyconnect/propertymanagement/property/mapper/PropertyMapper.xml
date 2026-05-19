@@ -32,7 +32,7 @@
 		<result column="onboarding_status" property="onboardingStatus" jdbcType="VARCHAR" />
 		<result column="active_status" property="activeStatus" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
 		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
@@ -71,7 +71,7 @@
 		<result column="status" property="status" jdbcType="VARCHAR" />
 		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
 		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
@@ -86,21 +86,21 @@
 		<result column="status" property="status" jdbcType="VARCHAR" />
 		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
-		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
 		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 
 	<select id="listProperties" resultMap="resultMapProperty">
 		SELECT p.*,
-			(SELECT COUNT(*) FROM pa_mst_block b WHERE b.parent_id = p.id AND b.active_status = 'ACTIVE') total_blocks,
-			(SELECT COUNT(*) FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = p.id AND f.active_status = 'ACTIVE') total_floors,
-			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = p.id AND u.active_status = 'ACTIVE') total_units,
-			(SELECT COUNT(*) FROM pa_mst_amenity a WHERE a.parent_id = p.id AND a.active_status = 'ACTIVE') total_amenities
+			(SELECT COUNT(*) FROM pa_mst_block b WHERE b.parent_id = p.id AND b.active_status = 'Y') total_blocks,
+			(SELECT COUNT(*) FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = p.id AND f.active_status = 'Y') total_floors,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = p.id AND u.active_status = 'Y') total_units,
+			(SELECT COUNT(*) FROM pa_mst_amenity a WHERE a.parent_id = p.id AND a.active_status = 'Y') total_amenities
 		FROM pa_mst_property p
 		<trim prefix="WHERE" prefixOverrides="AND|OR">
 			<if test="companyId != null">AND p.company_id = #{companyId}</if>
-			<if test="includeInactive == null or !includeInactive">AND p.active_status = 'ACTIVE'</if>
+			<if test="includeInactive == null or !includeInactive">AND p.active_status = 'Y'</if>
 			<if test="search != null and search != ''">
 				AND (LOWER(p.code) LIKE CONCAT('%', LOWER(#{search}), '%') OR LOWER(p.name) LIKE CONCAT('%', LOWER(#{search}), '%') OR LOWER(p.city) LIKE CONCAT('%', LOWER(#{search}), '%'))
 			</if>
@@ -135,14 +135,14 @@
 		SET company_id = #{companyId}, code = #{code}, name = #{name}, description = #{description}, property_type = #{propertyType},
 			region = #{region}, address_line1 = #{addressLine1}, city = #{city}, emirate = #{emirate}, country = #{country},
 			ownership_type = #{ownershipType}, owner_name = #{ownerName}, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
-		WHERE id = #{id} AND active_status = 'ACTIVE'
+		WHERE id = #{id} AND active_status = 'Y'
 	</update>
 
 	<update id="updatePropertyDocuments" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
 		UPDATE pa_mst_property
 		SET title_deed_no = #{titleDeedNo}, rera_permit_no = #{reraPermitNo}, document_reference = #{documentReference},
 			document_status = #{documentStatus}, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
-		WHERE id = #{id} AND active_status = 'ACTIVE'
+		WHERE id = #{id} AND active_status = 'Y'
 	</update>
 
 	<update id="updatePropertyOperatingModel" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
@@ -150,7 +150,7 @@
 		SET built_up_area = #{builtUpArea}, plot_area = #{plotArea}, market_value = #{marketValue},
 			annual_service_charge = #{annualServiceCharge}, operating_model = #{operatingModel}, facility_manager = #{facilityManager},
 			onboarding_status = COALESCE(#{onboardingStatus}, onboarding_status), updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
-		WHERE id = #{id} AND active_status = 'ACTIVE'
+		WHERE id = #{id} AND active_status = 'Y'
 	</update>
 
 	<select id="listOwnershipRows" parameterType="long" resultMap="resultMapOwnershipRow">
@@ -183,10 +183,10 @@
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 
-	<select id="listBlocks" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
-	<select id="listFloors" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_floor WHERE parent_id = #{blockId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
-	<select id="listUnits" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_unit WHERE parent_id = #{floorId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
-	<select id="listAmenities" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
+	<select id="listBlocks" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="listFloors" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_floor WHERE parent_id = #{blockId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="listUnits" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_unit WHERE parent_id = #{floorId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="listAmenities" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'Y' ORDER BY sort_order, name</select>
 
 	<sql id="insertMasterColumns">(company_id, code, name, description, parent_id, sort_order, attributes, active_status, created_by, updated_by)</sql>
 	<sql id="insertMasterValues">(#{companyId}, #{code}, #{name}, #{description}, #{parentId}, #{sortOrder}, #{attributes}, #{activeStatus}, #{createdBy}, #{updatedBy})</sql>
@@ -199,15 +199,15 @@
 		INSERT INTO pa_mst_block <include refid="insertMasterColumns" /> VALUES <include refid="insertMasterValues" />
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
-	<update id="updateBlock" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_block SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'ACTIVE'</update>
-	<update id="deactivateBlock">UPDATE pa_mst_block SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="updateBlock" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_block SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'Y'</update>
+	<update id="deactivateBlock">UPDATE pa_mst_block SET active_status = 'N', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'Y'</update>
 
 	<insert id="insertFloor" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
 		INSERT INTO pa_mst_floor <include refid="insertMasterColumns" /> VALUES <include refid="insertMasterValues" />
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
-	<update id="updateFloor" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_floor SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'ACTIVE'</update>
-	<update id="deactivateFloor">UPDATE pa_mst_floor SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="updateFloor" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_floor SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'Y'</update>
+	<update id="deactivateFloor">UPDATE pa_mst_floor SET active_status = 'N', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'Y'</update>
 
 	<insert id="insertUnit" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
 		INSERT INTO pa_mst_unit
@@ -220,16 +220,16 @@
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 	<update id="updateUnit" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
-		UPDATE pa_mst_unit SET <include refid="updateMasterSet" />, unit_code = #{code}, unit_type = #{name}, status = COALESCE(#{status}, status) WHERE id = #{id} AND active_status = 'ACTIVE'
+		UPDATE pa_mst_unit SET <include refid="updateMasterSet" />, unit_code = #{code}, unit_type = #{name}, status = COALESCE(#{status}, status) WHERE id = #{id} AND active_status = 'Y'
 	</update>
-	<update id="deactivateUnit">UPDATE pa_mst_unit SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, status = 'INACTIVE', updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="deactivateUnit">UPDATE pa_mst_unit SET active_status = 'N', active_to = CURRENT_TIMESTAMP, status = 'INACTIVE', updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'Y'</update>
 
 	<insert id="insertAmenity" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
 		INSERT INTO pa_mst_amenity <include refid="insertMasterColumns" /> VALUES <include refid="insertMasterValues" />
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
-	<update id="updateAmenity" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_amenity SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'ACTIVE'</update>
-	<update id="deactivateAmenity">UPDATE pa_mst_amenity SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="updateAmenity" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_amenity SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'Y'</update>
+	<update id="deactivateAmenity">UPDATE pa_mst_amenity SET active_status = 'N', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'Y'</update>
 
 	<select id="listWorkflow" parameterType="long" resultType="com.eba.propertyconnect.propertymanagement.property.domain.WorkflowRow">
 		SELECT id, property_id propertyId, step_code stepCode, step_name stepName, owner_name ownerName, progress_percent progressPercent,
@@ -248,19 +248,19 @@
 	</insert>
 
 	<select id="treeProperties" parameterType="long" resultMap="resultMapTreeNode">SELECT id, 'PROPERTY' type, code, name, onboarding_status status, NULL parent_id FROM pa_mst_property WHERE id = #{propertyId}</select>
-	<select id="treeBlocks" parameterType="long" resultMap="resultMapTreeNode">SELECT id, 'BLOCK' type, code, name, active_status status, parent_id FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
-	<select id="treeFloors" parameterType="long" resultMap="resultMapTreeNode">SELECT f.id, 'FLOOR' type, f.code, f.name, f.active_status status, f.parent_id FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND f.active_status = 'ACTIVE' ORDER BY f.sort_order, f.name</select>
-	<select id="treeUnits" parameterType="long" resultMap="resultMapTreeNode">SELECT u.id, 'UNIT' type, u.code, u.name, u.status, u.parent_id FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.active_status = 'ACTIVE' ORDER BY u.sort_order, u.name</select>
+	<select id="treeBlocks" parameterType="long" resultMap="resultMapTreeNode">SELECT id, 'BLOCK' type, code, name, active_status status, parent_id FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="treeFloors" parameterType="long" resultMap="resultMapTreeNode">SELECT f.id, 'FLOOR' type, f.code, f.name, f.active_status status, f.parent_id FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND f.active_status = 'Y' ORDER BY f.sort_order, f.name</select>
+	<select id="treeUnits" parameterType="long" resultMap="resultMapTreeNode">SELECT u.id, 'UNIT' type, u.code, u.name, u.status, u.parent_id FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.active_status = 'Y' ORDER BY u.sort_order, u.name</select>
 
 	<select id="summary" parameterType="long" resultType="com.eba.propertyconnect.propertymanagement.property.domain.PropertySummary">
 		SELECT #{propertyId} propertyId,
-			(SELECT COUNT(*) FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE') blockCount,
-			(SELECT COUNT(*) FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND f.active_status = 'ACTIVE') floorCount,
-			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.active_status = 'ACTIVE') unitCount,
-			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'OCCUPIED' AND u.active_status = 'ACTIVE') occupiedUnits,
-			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status IN ('VACANT','AVAILABLE') AND u.active_status = 'ACTIVE') vacantUnits,
-			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'RESERVED' AND u.active_status = 'ACTIVE') reservedUnits,
-			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'UNDER_MAINTENANCE' AND u.active_status = 'ACTIVE') maintenanceUnits,
-			(SELECT COUNT(*) FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE') amenityCount
+			(SELECT COUNT(*) FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'Y') blockCount,
+			(SELECT COUNT(*) FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND f.active_status = 'Y') floorCount,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.active_status = 'Y') unitCount,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'OCCUPIED' AND u.active_status = 'Y') occupiedUnits,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status IN ('VACANT','AVAILABLE') AND u.active_status = 'Y') vacantUnits,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'RESERVED' AND u.active_status = 'Y') reservedUnits,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'UNDER_MAINTENANCE' AND u.active_status = 'Y') maintenanceUnits,
+			(SELECT COUNT(*) FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'Y') amenityCount
 	</select>
 </mapper>

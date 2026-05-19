@@ -13,7 +13,7 @@ public class PropertyOwnershipRow {
 	public String status;
 	public Integer sortOrder;
 	public Long createdBy;
-	public Date createdAt;
+	public Date createdOn;
 	public Long updatedBy;
 	public Date updatedOn;
 }

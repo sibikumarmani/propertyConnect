@@ -46,15 +46,21 @@ Use audit columns where applicable:
 
 ```sql
 created_by BIGINT NULL,
-created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+created_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_by BIGINT NULL,
-updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
+updated_on DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
 ```
 
 Use status columns for workflow state:
 
 ```sql
 status VARCHAR(50) NOT NULL
+```
+
+Use `active_status` on master tables as a Y/N flag:
+
+```sql
+active_status ENUM('Y','N') NOT NULL DEFAULT 'Y'
 ```
 
 Use history tables for important status transitions.

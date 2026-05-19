@@ -70,7 +70,10 @@ const emptyStructure: StructureState = { blocks: [], floorsByBlock: {}, unitsByF
 const typeOptions = ["Residence", "Commercial", "Mixed Use", "Retail"];
 const unitTypeOptions = ["Studio", "1 Bed", "2 Bed", "3 Bed", "Retail", "Office"];
 const unitStatusOptions = ["VACANT", "OCCUPIED", "RESERVED", "UNDER_MAINTENANCE"];
-const activeStatusOptions = ["ACTIVE", "INACTIVE"];
+const activeStatusOptions = [
+  { label: "Active", value: "Y" },
+  { label: "Inactive", value: "N" },
+];
 
 export function PropertyViewWorkspace() {
   const [properties, setProperties] = useState<PropertyMaster[]>([]);
@@ -377,7 +380,7 @@ function NodeDetails({ node, property, summary, occupancyRate, onEdit }: { node:
           {node.type === "UNIT" ? <p className="mt-1 text-sm font-semibold text-[color:var(--foreground-muted)]">{[attrs.unitType || node.record.name, attrs.area, labelize(node.record.status)].filter(Boolean).join(" / ")}</p> : null}
         </div>
         <div className="flex items-center gap-2">
-          <span className="pill-brand rounded-full px-3 py-1 text-xs font-bold">{labelize(node.record.status || node.record.activeStatus)}</span>
+          <span className="pill-brand rounded-full px-3 py-1 text-xs font-bold">{node.type === "UNIT" ? labelize(node.record.status) : activeStatusLabel(node.record.activeStatus)}</span>
           <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold" onClick={onEdit} type="button">
             <Edit3 className="h-4 w-4" /> Edit
           </button>
@@ -414,7 +417,7 @@ function ReadOnlyGrid({ node }: { node: StructureNode }) {
         ["Residence Units", attrs.residenceUnits],
         ["Retail Units", attrs.retailUnits],
         ["Parking Bays", attrs.parkingBays],
-        ["Status", labelize(node.record.activeStatus)],
+        ["Status", activeStatusLabel(node.record.activeStatus)],
       ]
     : node.type === "FLOOR"
       ? [
@@ -426,7 +429,7 @@ function ReadOnlyGrid({ node }: { node: StructureNode }) {
           ["Retail Units", attrs.retailUnits],
           ["Vacant Units", attrs.vacantUnits],
           ["Reserved Units", attrs.reservedUnits],
-          ["Status", labelize(node.record.activeStatus)],
+          ["Status", activeStatusLabel(node.record.activeStatus)],
         ]
       : [
           ["Unit Number", node.record.code],
@@ -595,7 +598,7 @@ function newForm(type: NodeType, selectedNode?: StructureNode | null, structure:
     bedrooms: "",
     baseRent: "",
     serviceCharge: "",
-    status: type === "UNIT" ? "VACANT" : "ACTIVE",
+    status: type === "UNIT" ? "VACANT" : "Y",
   };
 }
 
@@ -617,7 +620,7 @@ function formFromNode(node: StructureNode): StructureForm {
     bedrooms: attrs.bedrooms || "",
     baseRent: attrs.baseRent || "",
     serviceCharge: attrs.serviceCharge || "",
-    status: node.type === "UNIT" ? node.record.status || "VACANT" : node.record.activeStatus || "ACTIVE",
+    status: node.type === "UNIT" ? node.record.status || "VACANT" : normalizeActiveStatus(node.record.activeStatus),
   };
 }
 
@@ -664,7 +667,7 @@ function baseRecord(form: StructureForm, existing: MasterRecord | undefined, att
     name,
     parentId: form.parentId ? Number(form.parentId) : existing?.parentId,
     sortOrder: existing?.sortOrder ?? 0,
-    activeStatus: form.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+    activeStatus: normalizeActiveStatus(form.status),
     attributes: JSON.stringify(attrs),
   };
 }
@@ -719,6 +722,15 @@ function codeFromName(value: string, fallback: string) {
 
 function labelize(value?: string) {
   return String(value ?? "ACTIVE").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function activeStatusLabel(value?: string) {
+  return normalizeActiveStatus(value) === "Y" ? "Active" : "Inactive";
+}
+
+function normalizeActiveStatus(value?: string) {
+  const normalized = String(value ?? "Y").toUpperCase();
+  return normalized === "N" || normalized === "INACTIVE" ? "N" : "Y";
 }
 
 function formatCurrencyValue(value?: string) {

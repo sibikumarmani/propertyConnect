@@ -62,7 +62,7 @@ const emptyProperty: PropertyMaster = {
   ownershipType: "OWN",
   ownerName: "",
   onboardingStatus: "DRAFT",
-  activeStatus: "ACTIVE",
+  activeStatus: "Y",
 };
 
 const tabs: { key: TabKey; label: string; icon: typeof Building2 }[] = [
@@ -879,7 +879,7 @@ function ownershipRowsFromProperty(property: PropertyMaster): OwnershipRow[] {
       role: labelize(property.ownershipType || "Owned Property"),
       shareRight: property.ownershipType === "MANAGED" ? "Managed" : "100%",
       reference: property.titleDeedNo || "Property Master",
-      status: property.activeStatus || "ACTIVE",
+      status: activeStatusLabel(property.activeStatus),
     },
   ];
 }
@@ -941,7 +941,7 @@ function normalizeRecord(record: DraftRecord): MasterRecord {
     code: required(record.code, "Code is required"),
     name: required(record.name, "Name is required"),
     attributes: record.attributes || "{}",
-    activeStatus: record.activeStatus || "ACTIVE",
+    activeStatus: normalizeActiveStatus(record.activeStatus),
   };
 }
 
@@ -968,4 +968,13 @@ function statusClass(value?: string) {
 
 function labelize(value?: string) {
   return String(value ?? "").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function activeStatusLabel(value?: string) {
+  return normalizeActiveStatus(value) === "Y" ? "Active" : "Inactive";
+}
+
+function normalizeActiveStatus(value?: string) {
+  const normalized = String(value ?? "Y").toUpperCase();
+  return normalized === "N" || normalized === "INACTIVE" ? "N" : "Y";
 }

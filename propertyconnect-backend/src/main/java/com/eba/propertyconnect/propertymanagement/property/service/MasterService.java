@@ -70,9 +70,23 @@ public class MasterService {
 		request.description = trimToNull(request.description);
 		request.attributes = normalizeJson(request.attributes);
 		request.sortOrder = request.sortOrder == null ? 0 : request.sortOrder;
-		request.activeStatus = isBlank(request.activeStatus) ? "ACTIVE" : request.activeStatus.trim().toUpperCase(Locale.ROOT);
+		request.activeStatus = normalizeActiveStatus(request.activeStatus);
 		request.activeFrom = request.activeFrom == null ? new Date() : request.activeFrom;
 		return request;
+	}
+
+	private String normalizeActiveStatus(String value) {
+		String normalized = isBlank(value) ? "Y" : value.trim().toUpperCase(Locale.ROOT);
+		if ("ACTIVE".equals(normalized) || "YES".equals(normalized) || "TRUE".equals(normalized) || "1".equals(normalized)) {
+			return "Y";
+		}
+		if ("INACTIVE".equals(normalized) || "NO".equals(normalized) || "FALSE".equals(normalized) || "0".equals(normalized)) {
+			return "N";
+		}
+		if ("Y".equals(normalized) || "N".equals(normalized)) {
+			return normalized;
+		}
+		throw new IllegalArgumentException("Active status must be Y or N");
 	}
 
 	private String normalizeJson(String attributes) {
