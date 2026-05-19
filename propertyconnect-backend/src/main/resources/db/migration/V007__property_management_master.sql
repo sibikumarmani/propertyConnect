@@ -1,0 +1,135 @@
+CREATE TABLE IF NOT EXISTS pa_mst_property (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    parent_id BIGINT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    attributes JSON NULL,
+    property_type VARCHAR(80) NOT NULL,
+    region VARCHAR(120) NULL,
+    address_line1 VARCHAR(255) NULL,
+    city VARCHAR(120) NULL,
+    emirate VARCHAR(120) NULL,
+    country VARCHAR(120) NOT NULL DEFAULT 'UAE',
+    ownership_type VARCHAR(80) NULL,
+    owner_name VARCHAR(255) NULL,
+    title_deed_no VARCHAR(120) NULL,
+    rera_permit_no VARCHAR(120) NULL,
+    document_reference VARCHAR(255) NULL,
+    document_status VARCHAR(80) NULL,
+    built_up_area DECIMAL(18,2) NULL,
+    plot_area DECIMAL(18,2) NULL,
+    market_value DECIMAL(18,2) NULL,
+    annual_service_charge DECIMAL(18,2) NULL,
+    operating_model VARCHAR(120) NULL,
+    facility_manager VARCHAR(255) NULL,
+    onboarding_status VARCHAR(80) NOT NULL DEFAULT 'DRAFT',
+    active_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    active_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active_to DATETIME NULL,
+    created_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_on DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pa_mst_property_company_code (company_id, code),
+    KEY idx_pa_mst_property_company_status (company_id, active_status, onboarding_status),
+    KEY idx_pa_mst_property_region_type (region, property_type)
+);
+
+CREATE TABLE IF NOT EXISTS pa_mst_block (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    parent_id BIGINT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    attributes JSON NULL,
+    active_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    active_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active_to DATETIME NULL,
+    created_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_on DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pa_mst_block_property_code (parent_id, code),
+    KEY idx_pa_mst_block_property_status (parent_id, active_status),
+    CONSTRAINT fk_pa_mst_block_property FOREIGN KEY (parent_id) REFERENCES pa_mst_property(id)
+);
+
+CREATE TABLE IF NOT EXISTS pa_mst_floor (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    parent_id BIGINT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    attributes JSON NULL,
+    active_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    active_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active_to DATETIME NULL,
+    created_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_on DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pa_mst_floor_block_code (parent_id, code),
+    KEY idx_pa_mst_floor_block_status (parent_id, active_status),
+    CONSTRAINT fk_pa_mst_floor_block FOREIGN KEY (parent_id) REFERENCES pa_mst_block(id)
+);
+
+CREATE TABLE IF NOT EXISTS pa_mst_amenity (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    parent_id BIGINT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    attributes JSON NULL,
+    active_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    active_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active_to DATETIME NULL,
+    created_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_on DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pa_mst_amenity_parent_code (parent_id, code),
+    KEY idx_pa_mst_amenity_parent_status (parent_id, active_status)
+);
+
+ALTER TABLE pa_mst_unit
+    ADD COLUMN company_id BIGINT NULL AFTER id,
+    ADD COLUMN code VARCHAR(100) NULL AFTER unit_type,
+    ADD COLUMN name VARCHAR(255) NULL AFTER code,
+    ADD COLUMN description TEXT NULL AFTER name,
+    ADD COLUMN parent_id BIGINT NULL AFTER description,
+    ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER parent_id,
+    ADD COLUMN attributes JSON NULL AFTER sort_order,
+    ADD COLUMN active_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' AFTER status,
+    ADD COLUMN active_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER active_status,
+    ADD COLUMN active_to DATETIME NULL AFTER active_from;
+
+UPDATE pa_mst_unit
+SET code = COALESCE(code, unit_code),
+    name = COALESCE(name, unit_type),
+    active_status = COALESCE(active_status, 'ACTIVE')
+WHERE code IS NULL OR name IS NULL;
+
+CREATE TABLE IF NOT EXISTS pa_txn_property_workflow (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    property_id BIGINT NOT NULL,
+    step_code VARCHAR(80) NOT NULL,
+    step_name VARCHAR(160) NOT NULL,
+    owner_name VARCHAR(255) NULL,
+    progress_percent INT NOT NULL DEFAULT 0,
+    state VARCHAR(80) NOT NULL DEFAULT 'PENDING',
+    sort_order INT NOT NULL DEFAULT 0,
+    updated_by BIGINT NULL,
+    updated_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pa_txn_property_workflow_step (property_id, step_code),
+    KEY idx_pa_txn_property_workflow_property (property_id, sort_order),
+    CONSTRAINT fk_pa_txn_property_workflow_property FOREIGN KEY (property_id) REFERENCES pa_mst_property(id)
+);

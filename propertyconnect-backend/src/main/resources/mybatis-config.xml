@@ -10,5 +10,6 @@
 	<mappers>
 		<package name="com.eba.propertyconnect.propertymanagement.leasing.mapper" />
 		<package name="com.eba.propertyconnect.propertymanagement.legal.mapper" />
+		<package name="com.eba.propertyconnect.propertymanagement.property.mapper" />
 	</mappers>
 </configuration>

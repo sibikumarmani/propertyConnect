@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.property.mapper.MasterMapper">
+	<resultMap id="resultMapMasterRecord" type="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
+		<result column="code" property="code" jdbcType="VARCHAR" />
+		<result column="name" property="name" jdbcType="VARCHAR" />
+		<result column="description" property="description" jdbcType="VARCHAR" />
+		<result column="parent_id" property="parentId" jdbcType="BIGINT" />
+		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
+		<result column="attributes" property="attributes" jdbcType="LONGVARCHAR" />
+		<result column="active_status" property="activeStatus" jdbcType="VARCHAR" />
+		<result column="active_from" property="activeFrom" jdbcType="TIMESTAMP" />
+		<result column="active_to" property="activeTo" jdbcType="TIMESTAMP" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+
+	<select id="list" resultMap="resultMapMasterRecord">
+		SELECT * FROM ${tableName}
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="companyId != null">AND company_id = #{companyId}</if>
+			<if test="!includeInactive">AND active_status = 'ACTIVE'</if>
+		</trim>
+		ORDER BY sort_order, name
+	</select>
+
+	<select id="get" resultMap="resultMapMasterRecord">
+		SELECT * FROM ${tableName} WHERE id = #{id}
+	</select>
+
+	<select id="getByCode" resultMap="resultMapMasterRecord">
+		SELECT * FROM ${tableName}
+		WHERE code = #{code}
+		<if test="companyId != null">AND company_id = #{companyId}</if>
+		LIMIT 1
+	</select>
+
+	<insert id="insert">
+		<choose>
+			<when test="tableName == 'pa_mst_property'">
+				INSERT INTO pa_mst_property
+					(company_id, code, name, description, parent_id, sort_order, attributes, property_type, active_status, active_from, created_by, updated_by)
+				VALUES
+					(#{record.companyId}, #{record.code}, #{record.name}, #{record.description}, #{record.parentId}, #{record.sortOrder},
+					 #{record.attributes}, 'GENERAL', #{record.activeStatus}, #{record.activeFrom}, #{record.createdBy}, #{record.updatedBy})
+			</when>
+			<when test="tableName == 'pa_mst_unit'">
+				INSERT INTO pa_mst_unit
+					(company_id, property_id, property_name, unit_code, unit_type, code, name, description, parent_id, sort_order, attributes,
+					 active_status, active_from, status, created_by, updated_by)
+				SELECT #{record.companyId}, p.id, p.name, #{record.code}, #{record.name}, #{record.code}, #{record.name}, #{record.description},
+					#{record.parentId}, #{record.sortOrder}, #{record.attributes}, #{record.activeStatus}, #{record.activeFrom}, 'VACANT',
+					#{record.createdBy}, #{record.updatedBy}
+				FROM pa_mst_floor f
+				JOIN pa_mst_block b ON b.id = f.parent_id
+				JOIN pa_mst_property p ON p.id = b.parent_id
+				WHERE f.id = #{record.parentId}
+			</when>
+			<otherwise>
+				INSERT INTO ${tableName}
+					(company_id, code, name, description, parent_id, sort_order, attributes, active_status, active_from, created_by, updated_by)
+				VALUES
+					(#{record.companyId}, #{record.code}, #{record.name}, #{record.description}, #{record.parentId}, #{record.sortOrder},
+					 #{record.attributes}, #{record.activeStatus}, #{record.activeFrom}, #{record.createdBy}, #{record.updatedBy})
+			</otherwise>
+		</choose>
+		<selectKey keyProperty="record.id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+
+	<update id="update">
+		UPDATE ${tableName}
+		SET code = #{record.code},
+			name = #{record.name},
+			description = #{record.description},
+			parent_id = #{record.parentId},
+			sort_order = #{record.sortOrder},
+			attributes = #{record.attributes},
+			active_status = #{record.activeStatus},
+			<if test="tableName == 'pa_mst_unit'">
+				unit_code = #{record.code},
+				unit_type = #{record.name},
+			</if>
+			updated_by = #{record.updatedBy},
+			updated_on = CURRENT_TIMESTAMP
+		WHERE id = #{record.id}
+		  AND active_status = 'ACTIVE'
+	</update>
+
+	<update id="deactivate">
+		UPDATE ${tableName}
+		SET active_status = 'INACTIVE',
+			active_to = CURRENT_TIMESTAMP,
+			updated_by = #{updatedBy},
+			updated_on = CURRENT_TIMESTAMP
+		WHERE id = #{id}
+		  AND active_status = 'ACTIVE'
+	</update>
+</mapper>

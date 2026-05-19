@@ -4,6 +4,9 @@ import {
   FileText,
   LayoutDashboard,
   Scale,
+  Building2,
+  Eye,
+  Landmark,
   UserCheck,
   UserPlus,
   UsersRound,
@@ -49,6 +52,14 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { href: "/propertyconnect/legal-management/dashboard", label: "Legal Dashboard", icon: LayoutDashboard },
       { href: "/propertyconnect/legal-management/legal-card", label: "Legal Card", icon: FileText },
+    ],
+  },
+  {
+    label: "Property Management",
+    icon: Building2,
+    items: [
+      { href: "/propertyconnect/property-management/property-master", label: "Property Master", icon: Landmark },
+      { href: "/propertyconnect/property-management/property-view", label: "Property View", icon: Eye },
     ],
   },
 ];

@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eba.propertyconnect.propertymanagement.property.mapper.PropertyMapper">
+	<resultMap id="resultMapProperty" type="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
+		<result column="code" property="code" jdbcType="VARCHAR" />
+		<result column="name" property="name" jdbcType="VARCHAR" />
+		<result column="description" property="description" jdbcType="VARCHAR" />
+		<result column="property_type" property="propertyType" jdbcType="VARCHAR" />
+		<result column="region" property="region" jdbcType="VARCHAR" />
+		<result column="address_line1" property="addressLine1" jdbcType="VARCHAR" />
+		<result column="city" property="city" jdbcType="VARCHAR" />
+		<result column="emirate" property="emirate" jdbcType="VARCHAR" />
+		<result column="country" property="country" jdbcType="VARCHAR" />
+		<result column="ownership_type" property="ownershipType" jdbcType="VARCHAR" />
+		<result column="owner_name" property="ownerName" jdbcType="VARCHAR" />
+		<result column="title_deed_no" property="titleDeedNo" jdbcType="VARCHAR" />
+		<result column="rera_permit_no" property="reraPermitNo" jdbcType="VARCHAR" />
+		<result column="document_reference" property="documentReference" jdbcType="VARCHAR" />
+		<result column="document_status" property="documentStatus" jdbcType="VARCHAR" />
+		<result column="total_blocks" property="totalBlocks" jdbcType="INTEGER" />
+		<result column="total_floors" property="totalFloors" jdbcType="INTEGER" />
+		<result column="total_units" property="totalUnits" jdbcType="INTEGER" />
+		<result column="total_amenities" property="totalAmenities" jdbcType="INTEGER" />
+		<result column="built_up_area" property="builtUpArea" jdbcType="DECIMAL" />
+		<result column="plot_area" property="plotArea" jdbcType="DECIMAL" />
+		<result column="market_value" property="marketValue" jdbcType="DECIMAL" />
+		<result column="annual_service_charge" property="annualServiceCharge" jdbcType="DECIMAL" />
+		<result column="operating_model" property="operatingModel" jdbcType="VARCHAR" />
+		<result column="facility_manager" property="facilityManager" jdbcType="VARCHAR" />
+		<result column="onboarding_status" property="onboardingStatus" jdbcType="VARCHAR" />
+		<result column="active_status" property="activeStatus" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+
+	<resultMap id="resultMapMasterRecord" type="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
+		<result column="code" property="code" jdbcType="VARCHAR" />
+		<result column="name" property="name" jdbcType="VARCHAR" />
+		<result column="description" property="description" jdbcType="VARCHAR" />
+		<result column="parent_id" property="parentId" jdbcType="BIGINT" />
+		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
+		<result column="attributes" property="attributes" jdbcType="LONGVARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="active_status" property="activeStatus" jdbcType="VARCHAR" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+
+	<resultMap id="resultMapTreeNode" type="com.eba.propertyconnect.propertymanagement.property.domain.PropertyTreeNode">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="type" property="type" jdbcType="VARCHAR" />
+		<result column="code" property="code" jdbcType="VARCHAR" />
+		<result column="name" property="name" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="parent_id" property="parentId" jdbcType="BIGINT" />
+	</resultMap>
+
+	<resultMap id="resultMapOwnershipRow" type="com.eba.propertyconnect.propertymanagement.property.domain.PropertyOwnershipRow">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="party" property="party" jdbcType="VARCHAR" />
+		<result column="role" property="role" jdbcType="VARCHAR" />
+		<result column="share_right" property="shareRight" jdbcType="VARCHAR" />
+		<result column="reference" property="reference" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+
+	<resultMap id="resultMapDocumentRow" type="com.eba.propertyconnect.propertymanagement.property.domain.PropertyDocumentRow">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="document" property="document" jdbcType="VARCHAR" />
+		<result column="category" property="category" jdbcType="VARCHAR" />
+		<result column="reference" property="reference" jdbcType="VARCHAR" />
+		<result column="updated_date" property="updatedDate" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_at" property="createdAt" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+
+	<select id="listProperties" resultMap="resultMapProperty">
+		SELECT p.*,
+			(SELECT COUNT(*) FROM pa_mst_block b WHERE b.parent_id = p.id AND b.active_status = 'ACTIVE') total_blocks,
+			(SELECT COUNT(*) FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = p.id AND f.active_status = 'ACTIVE') total_floors,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = p.id AND u.active_status = 'ACTIVE') total_units,
+			(SELECT COUNT(*) FROM pa_mst_amenity a WHERE a.parent_id = p.id AND a.active_status = 'ACTIVE') total_amenities
+		FROM pa_mst_property p
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="companyId != null">AND p.company_id = #{companyId}</if>
+			<if test="includeInactive == null or !includeInactive">AND p.active_status = 'ACTIVE'</if>
+			<if test="search != null and search != ''">
+				AND (LOWER(p.code) LIKE CONCAT('%', LOWER(#{search}), '%') OR LOWER(p.name) LIKE CONCAT('%', LOWER(#{search}), '%') OR LOWER(p.city) LIKE CONCAT('%', LOWER(#{search}), '%'))
+			</if>
+			<if test="region != null and region != ''">AND p.region = #{region}</if>
+			<if test="propertyType != null and propertyType != ''">AND p.property_type = #{propertyType}</if>
+			<if test="onboardingStatus != null and onboardingStatus != ''">AND p.onboarding_status = #{onboardingStatus}</if>
+		</trim>
+		ORDER BY p.updated_on DESC, p.name
+		LIMIT #{pageSize} OFFSET #{offset}
+	</select>
+
+	<select id="getProperty" parameterType="long" resultMap="resultMapProperty">
+		SELECT * FROM pa_mst_property WHERE id = #{id}
+	</select>
+
+	<select id="getPropertyByCode" resultMap="resultMapProperty">
+		SELECT * FROM pa_mst_property WHERE company_id = #{companyId} AND code = #{code} LIMIT 1
+	</select>
+
+	<insert id="insertProperty" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
+		INSERT INTO pa_mst_property
+			(company_id, code, name, description, property_type, region, address_line1, city, emirate, country,
+			 ownership_type, owner_name, onboarding_status, active_status, created_by, updated_by)
+		VALUES
+			(#{companyId}, #{code}, #{name}, #{description}, #{propertyType}, #{region}, #{addressLine1}, #{city}, #{emirate}, #{country},
+			 #{ownershipType}, #{ownerName}, #{onboardingStatus}, #{activeStatus}, #{createdBy}, #{updatedBy})
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+
+	<update id="updatePropertyProfile" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
+		UPDATE pa_mst_property
+		SET company_id = #{companyId}, code = #{code}, name = #{name}, description = #{description}, property_type = #{propertyType},
+			region = #{region}, address_line1 = #{addressLine1}, city = #{city}, emirate = #{emirate}, country = #{country},
+			ownership_type = #{ownershipType}, owner_name = #{ownerName}, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
+		WHERE id = #{id} AND active_status = 'ACTIVE'
+	</update>
+
+	<update id="updatePropertyDocuments" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
+		UPDATE pa_mst_property
+		SET title_deed_no = #{titleDeedNo}, rera_permit_no = #{reraPermitNo}, document_reference = #{documentReference},
+			document_status = #{documentStatus}, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
+		WHERE id = #{id} AND active_status = 'ACTIVE'
+	</update>
+
+	<update id="updatePropertyOperatingModel" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster">
+		UPDATE pa_mst_property
+		SET built_up_area = #{builtUpArea}, plot_area = #{plotArea}, market_value = #{marketValue},
+			annual_service_charge = #{annualServiceCharge}, operating_model = #{operatingModel}, facility_manager = #{facilityManager},
+			onboarding_status = COALESCE(#{onboardingStatus}, onboarding_status), updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
+		WHERE id = #{id} AND active_status = 'ACTIVE'
+	</update>
+
+	<select id="listOwnershipRows" parameterType="long" resultMap="resultMapOwnershipRow">
+		SELECT * FROM pa_mst_property_ownership WHERE property_id = #{propertyId} AND status != 'INACTIVE' ORDER BY sort_order, id
+	</select>
+
+	<insert id="upsertOwnershipRow" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyOwnershipRow">
+		INSERT INTO pa_mst_property_ownership
+			(id, property_id, party, role, share_right, reference, status, sort_order, created_by, updated_by)
+		VALUES
+			(#{id}, #{propertyId}, #{party}, #{role}, #{shareRight}, #{reference}, #{status}, #{sortOrder}, #{createdBy}, #{updatedBy})
+		ON DUPLICATE KEY UPDATE party = VALUES(party), role = VALUES(role), share_right = VALUES(share_right),
+			reference = VALUES(reference), status = VALUES(status), sort_order = VALUES(sort_order),
+			updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+
+	<select id="listDocumentRows" parameterType="long" resultMap="resultMapDocumentRow">
+		SELECT * FROM pa_mst_property_document WHERE property_id = #{propertyId} AND status != 'INACTIVE' ORDER BY sort_order, id
+	</select>
+
+	<insert id="upsertDocumentRow" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyDocumentRow">
+		INSERT INTO pa_mst_property_document
+			(id, property_id, document, category, reference, updated_date, status, sort_order, created_by, updated_by)
+		VALUES
+			(#{id}, #{propertyId}, #{document}, #{category}, #{reference}, #{updatedDate}, #{status}, #{sortOrder}, #{createdBy}, #{updatedBy})
+		ON DUPLICATE KEY UPDATE document = VALUES(document), category = VALUES(category), reference = VALUES(reference),
+			updated_date = VALUES(updated_date), status = VALUES(status), sort_order = VALUES(sort_order),
+			updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+
+	<select id="listBlocks" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
+	<select id="listFloors" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_floor WHERE parent_id = #{blockId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
+	<select id="listUnits" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_unit WHERE parent_id = #{floorId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
+	<select id="listAmenities" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
+
+	<sql id="insertMasterColumns">(company_id, code, name, description, parent_id, sort_order, attributes, active_status, created_by, updated_by)</sql>
+	<sql id="insertMasterValues">(#{companyId}, #{code}, #{name}, #{description}, #{parentId}, #{sortOrder}, #{attributes}, #{activeStatus}, #{createdBy}, #{updatedBy})</sql>
+	<sql id="updateMasterSet">
+		code = #{code}, name = #{name}, description = #{description}, sort_order = #{sortOrder}, attributes = #{attributes},
+		active_status = #{activeStatus}, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
+	</sql>
+
+	<insert id="insertBlock" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		INSERT INTO pa_mst_block <include refid="insertMasterColumns" /> VALUES <include refid="insertMasterValues" />
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<update id="updateBlock" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_block SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="deactivateBlock">UPDATE pa_mst_block SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+
+	<insert id="insertFloor" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		INSERT INTO pa_mst_floor <include refid="insertMasterColumns" /> VALUES <include refid="insertMasterValues" />
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<update id="updateFloor" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_floor SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="deactivateFloor">UPDATE pa_mst_floor SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+
+	<insert id="insertUnit" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		INSERT INTO pa_mst_unit
+			(company_id, property_id, property_name, unit_code, unit_type, code, name, description, parent_id, sort_order, attributes, active_status, status, created_by, updated_by)
+		SELECT #{companyId}, p.id, p.name, #{code}, #{name}, #{code}, #{name}, #{description}, #{parentId}, #{sortOrder}, #{attributes}, #{activeStatus}, COALESCE(#{status}, 'VACANT'), #{createdBy}, #{updatedBy}
+		FROM pa_mst_floor f
+		JOIN pa_mst_block b ON b.id = f.parent_id
+		JOIN pa_mst_property p ON p.id = b.parent_id
+		WHERE f.id = #{parentId}
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<update id="updateUnit" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		UPDATE pa_mst_unit SET <include refid="updateMasterSet" />, unit_code = #{code}, unit_type = #{name}, status = COALESCE(#{status}, status) WHERE id = #{id} AND active_status = 'ACTIVE'
+	</update>
+	<update id="deactivateUnit">UPDATE pa_mst_unit SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, status = 'INACTIVE', updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+
+	<insert id="insertAmenity" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">
+		INSERT INTO pa_mst_amenity <include refid="insertMasterColumns" /> VALUES <include refid="insertMasterValues" />
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+	<update id="updateAmenity" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord">UPDATE pa_mst_amenity SET <include refid="updateMasterSet" /> WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+	<update id="deactivateAmenity">UPDATE pa_mst_amenity SET active_status = 'INACTIVE', active_to = CURRENT_TIMESTAMP, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP WHERE id = #{id} AND active_status = 'ACTIVE'</update>
+
+	<select id="listWorkflow" parameterType="long" resultType="com.eba.propertyconnect.propertymanagement.property.domain.WorkflowRow">
+		SELECT id, property_id propertyId, step_code stepCode, step_name stepName, owner_name ownerName, progress_percent progressPercent,
+			state, sort_order sortOrder, updated_by updatedBy, updated_on updatedOn
+		FROM pa_txn_property_workflow
+		WHERE property_id = #{propertyId}
+		ORDER BY sort_order, id
+	</select>
+
+	<insert id="upsertWorkflow" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.WorkflowRow">
+		INSERT INTO pa_txn_property_workflow (property_id, step_code, step_name, owner_name, progress_percent, state, sort_order, updated_by)
+		VALUES (#{propertyId}, #{stepCode}, #{stepName}, #{ownerName}, #{progressPercent}, #{state}, #{sortOrder}, #{updatedBy})
+		ON DUPLICATE KEY UPDATE step_name = VALUES(step_name), owner_name = VALUES(owner_name), progress_percent = VALUES(progress_percent),
+			state = VALUES(state), sort_order = VALUES(sort_order), updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+
+	<select id="treeProperties" parameterType="long" resultMap="resultMapTreeNode">SELECT id, 'PROPERTY' type, code, name, onboarding_status status, NULL parent_id FROM pa_mst_property WHERE id = #{propertyId}</select>
+	<select id="treeBlocks" parameterType="long" resultMap="resultMapTreeNode">SELECT id, 'BLOCK' type, code, name, active_status status, parent_id FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE' ORDER BY sort_order, name</select>
+	<select id="treeFloors" parameterType="long" resultMap="resultMapTreeNode">SELECT f.id, 'FLOOR' type, f.code, f.name, f.active_status status, f.parent_id FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND f.active_status = 'ACTIVE' ORDER BY f.sort_order, f.name</select>
+	<select id="treeUnits" parameterType="long" resultMap="resultMapTreeNode">SELECT u.id, 'UNIT' type, u.code, u.name, u.status, u.parent_id FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.active_status = 'ACTIVE' ORDER BY u.sort_order, u.name</select>
+
+	<select id="summary" parameterType="long" resultType="com.eba.propertyconnect.propertymanagement.property.domain.PropertySummary">
+		SELECT #{propertyId} propertyId,
+			(SELECT COUNT(*) FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE') blockCount,
+			(SELECT COUNT(*) FROM pa_mst_floor f JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND f.active_status = 'ACTIVE') floorCount,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.active_status = 'ACTIVE') unitCount,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'OCCUPIED' AND u.active_status = 'ACTIVE') occupiedUnits,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status IN ('VACANT','AVAILABLE') AND u.active_status = 'ACTIVE') vacantUnits,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'RESERVED' AND u.active_status = 'ACTIVE') reservedUnits,
+			(SELECT COUNT(*) FROM pa_mst_unit u JOIN pa_mst_floor f ON f.id = u.parent_id JOIN pa_mst_block b ON b.id = f.parent_id WHERE b.parent_id = #{propertyId} AND u.status = 'UNDER_MAINTENANCE' AND u.active_status = 'ACTIVE') maintenanceUnits,
+			(SELECT COUNT(*) FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'ACTIVE') amenityCount
+	</select>
+</mapper>
