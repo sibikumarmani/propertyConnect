@@ -40,11 +40,17 @@ import org.w3c.dom.Document;
 public class CoreConnectAuthSoapClient {
 
 	private static final String COMMON_WEB_SERVICE = "CommonWebService";
+	private static final String CUSTOMER_VENDOR_WEB_SERVICE = "CustomerVendorWebService";
 	private static final String SECURITY_WEB_SERVICE = "SecurityWebService";
 	private static final String VALIDATE_USER_CREDENTIALS = "validateUserCredentials";
 	private static final String VALIDATE_USER_COMPANY = "validateUserCompany";
 	private static final String GET_COMPANY = "getCompany";
 	private static final String GET_COMPANY_BY_USER = "getCompanyByUser";
+	private static final String GET_CODE = "getCode";
+	private static final String GET_CODE_VALUE = "getCodeValue";
+	private static final String GET_CLIENT_CODE_VALUE = "getClientCodeValue";
+	private static final String GET_COMPANY_CODE_VALUE = "getCompanyCodeValue";
+	private static final String GET_CUSTOMER = "getCustomer";
 	private static final String PARAM_SEARCH = "search";
 	private static final String PARAM_USER_PROFILE = "userProfile";
 	private static final String PROPERTYCONNECT_SYSTEM_ID = "propertyConnect";
@@ -80,7 +86,58 @@ public class CoreConnectAuthSoapClient {
 			addProperty(search, "userId", firstInteger(loggedUserProfile, "id", "userId"));
 		}
 		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, operation, soapParameter(PARAM_SEARCH, search));
-		return toJsonArray(result, "company", "companies");
+		return toJsonArray(result, "company");
+	}
+
+	public JsonArray getCustomer(Long companyId) {
+		JsonObject search = new JsonObject();
+		addProperty(search, "companyId", companyId);
+		JsonElement result = callErpOperationResult(CUSTOMER_VENDOR_WEB_SERVICE, GET_CUSTOMER, soapParameter(PARAM_SEARCH, search));
+		return toJsonArray(result, "businessParty");
+	}
+
+	public JsonArray getCode() {
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_CODE, soapParameter(PARAM_SEARCH, new JsonObject()));
+		return toJsonArray(result, "code");
+	}
+
+	public JsonArray getCodeValue() {
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_CODE_VALUE, soapParameter(PARAM_SEARCH, new JsonObject()));
+		return toJsonArray(result, "codeValue");
+	}
+
+	public JsonArray getCodeValue(Long codeId) {
+		JsonObject search = codeValueSearch(codeId);
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_CODE_VALUE, soapParameter(PARAM_SEARCH, search));
+		return toJsonArray(result, "codeValue");
+	}
+
+	public JsonArray getClientCodeValue(Long clientId) {
+		JsonObject search = new JsonObject();
+		addProperty(search, "clientId", clientId);
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_CLIENT_CODE_VALUE, soapParameter(PARAM_SEARCH, search));
+		return toJsonArray(result, "codeValue");
+	}
+
+	public JsonArray getClientCodeValue(Long clientId, Long codeId) {
+		JsonObject search = codeValueSearch(codeId);
+		addProperty(search, "clientId", clientId);
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_CLIENT_CODE_VALUE, soapParameter(PARAM_SEARCH, search));
+		return toJsonArray(result, "codeValue");
+	}
+
+	public JsonArray getCompanyCodeValue(Long companyId) {
+		JsonObject search = new JsonObject();
+		addProperty(search, "companyId", companyId);
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_COMPANY_CODE_VALUE, soapParameter(PARAM_SEARCH, search));
+		return toJsonArray(result, "codeValue");
+	}
+
+	public JsonArray getCompanyCodeValue(Long companyId, Long codeId) {
+		JsonObject search = codeValueSearch(codeId);
+		addProperty(search, "companyId", companyId);
+		JsonElement result = callErpOperationResult(COMMON_WEB_SERVICE, GET_COMPANY_CODE_VALUE, soapParameter(PARAM_SEARCH, search));
+		return toJsonArray(result, "codeValue");
 	}
 
 	public JsonObject validateUserCompany(JsonObject userProfile, JsonObject search) {
@@ -96,6 +153,12 @@ public class CoreConnectAuthSoapClient {
 
 	private SoapParameter soapParameter(String elementName, JsonObject value) {
 		return new SoapParameter(elementName, value);
+	}
+
+	private JsonObject codeValueSearch(Long codeId) {
+		JsonObject search = new JsonObject();
+		addProperty(search, "codeId", codeId);
+		return search;
 	}
 
 	private JsonObject callErpOperation(String webServiceName, String operation, SoapParameter... parameters) {
@@ -322,7 +385,7 @@ public class CoreConnectAuthSoapClient {
 	}
 
 	private JsonObject effectiveUserProfile(JsonObject source) {
-		JsonObject nestedProfile = firstObject(source, "userProfile", "loggedUserProfile", "loggedUser", "user");
+		JsonObject nestedProfile = firstObject(source, "userProfile");
 		return nestedProfile == null ? source : nestedProfile;
 	}
 
@@ -359,6 +422,12 @@ public class CoreConnectAuthSoapClient {
 	private void addProperty(JsonObject object, String name, Number value) {
 		if (value != null) {
 			object.addProperty(name, value);
+		}
+	}
+
+	private void addProperty(JsonObject object, String name, String value) {
+		if (!ApplicationConfig.isBlank(value)) {
+			object.addProperty(name, value.trim());
 		}
 	}
 

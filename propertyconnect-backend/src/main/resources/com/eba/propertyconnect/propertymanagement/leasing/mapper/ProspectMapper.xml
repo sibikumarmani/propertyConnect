@@ -8,7 +8,7 @@
 		<result column="prospect_no" property="prospectNo" jdbcType="VARCHAR" />
 		<result column="customer_id" property="customerId" jdbcType="BIGINT" />
 		<result column="customer_code" property="customerCode" jdbcType="VARCHAR" />
-		<result column="customer_type" property="customerType" jdbcType="VARCHAR" />
+		<result column="customer_type" property="customerType" jdbcType="INTEGER" />
 		<result column="customer_name" property="customerName" jdbcType="VARCHAR" />
 		<result column="trade_license_no" property="tradeLicenseNo" jdbcType="VARCHAR" />
 		<result column="cr_number" property="crNumber" jdbcType="VARCHAR" />

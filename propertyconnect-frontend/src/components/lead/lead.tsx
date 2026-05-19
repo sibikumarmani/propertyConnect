@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BadgeCheck, Edit3, Loader2, Plus, RefreshCcw, Save, Search, Send, UserCheck, UserPlus, UsersRound, X, type LucideIcon } from "lucide-react";
 
 import { WorkspaceDrawer } from "@/components/layout/workspace-drawer";
-import { convertLeadToProspect, createLead, listLeads, qualifyLead, searchCustomers, updateLead, type CustomerMaster, type Lead, type LeadStageTarget } from "@/lib/lead";
+import { convertLeadToProspect, createLead, listCodeValues, listLeads, qualifyLead, searchCustomers, updateLead, type BusinessParty, type ErpCodeValue, type Lead, type LeadStageTarget } from "@/lib/lead";
 import { listProspects, type Prospect } from "@/lib/prospect";
 
 export type LeadScreen = "leads" | "lead-entry";
@@ -26,7 +26,8 @@ type LeadBoardProps = {
   leadStageCards: LeadStageCard[];
   leadStatusFilter: string;
   leadStatuses: string[];
-  customers: CustomerMaster[];
+  customerTypeOptions: ErpCodeValue[];
+  customers: BusinessParty[];
   customerLookupLoading: boolean;
   customerLookupOpen: boolean;
   customerSearch: string;
@@ -50,7 +51,7 @@ type LeadBoardProps = {
   onCustomerClear: () => void;
   onCustomerLookup: (search?: string) => void;
   onCustomerSearchChange: (value: string) => void;
-  onCustomerSelect: (customer: CustomerMaster) => void;
+  onCustomerSelect: (customer: BusinessParty) => void;
   onMoveStage: (lead: Lead) => void;
   onNotesChange: (value: string) => void;
   onProspectDetailsChange: (details: ProspectDetails) => void;
@@ -62,7 +63,8 @@ type LeadBoardProps = {
 };
 
 type ProspectDetails = {
-  customerType: string;
+  customerType?: number;
+  customerTypeName?: string;
   customerName: string;
   tradeLicenseNo: string;
   crNumber: string;
@@ -84,7 +86,7 @@ type ProspectDetails = {
 
 const initialLead: Lead = {
   customerId: undefined,
-  customerType: "Commercial",
+  customerType: undefined,
   customerName: "",
   contactPerson: "",
   mobileNo: "",
@@ -93,12 +95,12 @@ const initialLead: Lead = {
   purpose: "RENT",
 };
 const initialLeadStageTarget: LeadStageTarget = "QUALIFIED";
-const customerTypeOptions = ["Commercial", "Residential", "Retail", "Corporate", "Individual", "Government"];
 const preferredContactOptions = ["WhatsApp", "Email", "Phone Call", "SMS"];
 
 function initialProspectDetails(lead?: Lead): ProspectDetails {
   return {
-    customerType: lead?.customerType ?? "Commercial",
+    customerType: lead?.customerType,
+    customerTypeName: lead?.customerTypeName,
     customerName: lead?.customerName ?? "",
     tradeLicenseNo: "",
     crNumber: "",
@@ -127,7 +129,8 @@ const leadScreenMeta: Record<LeadScreen, { title: string; subtitle: string; icon
 export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
-  const [customers, setCustomers] = useState<CustomerMaster[]>([]);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<ErpCodeValue[]>([]);
+  const [customers, setCustomers] = useState<BusinessParty[]>([]);
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false);
   const [customerLookupOpen, setCustomerLookupOpen] = useState(false);
   const [leadForm, setLeadForm] = useState<Lead>(initialLead);
@@ -159,7 +162,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
         [
           lead.leadNo,
           lead.customerCode,
-          lead.customerType,
+          lead.customerTypeName,
           lead.customerName,
           lead.contactPerson,
           lead.mobileNo,
@@ -188,9 +191,10 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
     setLoading(true);
     setError("");
     try {
-      const [loadedLeads, loadedProspects] = await Promise.all([listLeads(), listProspects()]);
+      const [loadedLeads, loadedProspects, loadedCustomerTypes] = await Promise.all([listLeads(), listProspects(), listCodeValues("cf_firm_type")]);
       setLeads(loadedLeads);
       setProspects(loadedProspects);
+      setCustomerTypeOptions(loadedCustomerTypes);
       setSelectedLeadId((currentId) => {
         if (currentId && loadedLeads.some((lead) => lead.id === currentId)) {
           return currentId;
@@ -236,7 +240,6 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
       }
       setLeadForm(initialLead);
       setCustomerSearch("");
-      setCustomers([]);
       setCustomerLookupOpen(false);
       setLeadDrawerMode(null);
     }, leadDrawerMode === "edit" ? "Lead updated." : "Lead created.");
@@ -245,7 +248,6 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   function openCreateLead() {
     setLeadForm(initialLead);
     setCustomerSearch("");
-    setCustomers([]);
     setCustomerLookupOpen(false);
     setLeadDrawerMode("create");
   }
@@ -253,7 +255,6 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   function openEditLead(lead: Lead) {
     setLeadForm({ ...lead, purpose: lead.purpose ?? "RENT" });
     setCustomerSearch(lead.customerCode ?? "");
-    setCustomers([]);
     setCustomerLookupOpen(false);
     setLeadDrawerMode("edit");
   }
@@ -273,19 +274,22 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
     }
   }
 
-  function selectCustomer(customer: CustomerMaster) {
+  function selectCustomer(businessParty: BusinessParty) {
+    const customerType = customerTypeIdFromBusinessParty(businessParty, customerTypeOptions);
+    const selectedCustomerType = customerTypeOptions.find((option) => option.id === customerType);
     setLeadForm((currentLead) => ({
       ...currentLead,
-      customerId: customer.id,
-      customerCode: customer.customerCode,
-      customerType: customer.customerType,
-      customerName: customer.customerName,
-      contactPerson: customer.contactPerson,
-      mobileNo: customer.mobileNo ?? "",
-      email: customer.email,
-      preferredContactMethod: customer.preferredContactMethod ?? currentLead.preferredContactMethod,
+      customerId: businessParty.id,
+      customerCode: businessParty.externalId,
+      customerType,
+      customerTypeName: selectedCustomerType?.value ?? businessParty.typeOfBusinessName,
+      customerName: businessParty.name ?? businessParty.legalName ?? "",
+      contactPerson: businessParty.legalName,
+      mobileNo: businessParty.contactNumber ?? "",
+      email: businessParty.email,
+      preferredContactMethod: currentLead.preferredContactMethod,
     }));
-    setCustomerSearch(customer.customerName);
+    setCustomerSearch(businessParty.name ?? businessParty.legalName ?? "");
     setCustomerLookupOpen(false);
   }
 
@@ -294,7 +298,8 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
       ...currentLead,
       customerId: undefined,
       customerCode: "",
-      customerType: currentLead.customerType || "Commercial",
+      customerType: currentLead.customerType,
+      customerTypeName: currentLead.customerTypeName,
       customerName: "",
       contactPerson: "",
       mobileNo: "",
@@ -366,6 +371,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
           leadStageCards={leadStageCards}
           leadStatusFilter={leadStatusFilter}
           leadStatuses={leadStatuses}
+          customerTypeOptions={customerTypeOptions}
           customers={customers}
           customerLookupLoading={customerLookupLoading}
           customerLookupOpen={customerLookupOpen}
@@ -410,6 +416,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
               customerLookupLoading={customerLookupLoading}
               customerLookupOpen={customerLookupOpen}
               customerSearch={customerSearch}
+              customerTypeOptions={customerTypeOptions}
               leadForm={leadForm}
               wide
               onCustomerSearchChange={setCustomerSearch}
@@ -437,6 +444,7 @@ function LeadBoard({
   leadStageCards,
   leadStatusFilter,
   leadStatuses,
+  customerTypeOptions,
   customers,
   customerLookupLoading,
   customerLookupOpen,
@@ -575,6 +583,7 @@ function LeadBoard({
             customerLookupLoading={customerLookupLoading}
             customerLookupOpen={customerLookupOpen}
             customerSearch={customerSearch}
+            customerTypeOptions={customerTypeOptions}
             leadForm={leadForm}
             onCustomerClear={onCustomerClear}
             onCustomerLookup={onCustomerLookup}
@@ -595,6 +604,7 @@ function LeadBoard({
         lead={stageLead}
         notes={stageNotes}
         prospectDetails={stageProspectDetails}
+        customerTypeOptions={customerTypeOptions}
         saving={saving}
         score={stageScore}
         target={stageTarget}
@@ -650,7 +660,7 @@ function LeadDetailPanel({ lead, prospect, onEditLead, onMoveStage }: { lead: Le
       <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
         <DetailItem label="Mobile no" value={lead.mobileNo} />
         <DetailItem label="Customer code" value={lead.customerCode} />
-        <DetailItem label="Customer type" value={lead.customerType} />
+        <DetailItem label="Customer type" value={lead.customerTypeName} />
         <DetailItem label="Contact person name" value={lead.contactPerson} />
         <DetailItem label="Email" value={lead.email} />
         <DetailItem label="Preferred contact" value={lead.preferredContactMethod} />
@@ -691,6 +701,7 @@ function LeadCustomerEntryFields({
   customerLookupLoading,
   customerLookupOpen,
   customerSearch,
+  customerTypeOptions,
   leadForm,
   wide = false,
   onCustomerClear,
@@ -699,22 +710,22 @@ function LeadCustomerEntryFields({
   onCustomerSelect,
   onLeadFormChange,
 }: {
-  customers: CustomerMaster[];
+  customers: BusinessParty[];
   customerLookupLoading: boolean;
   customerLookupOpen: boolean;
   customerSearch: string;
+  customerTypeOptions: ErpCodeValue[];
   leadForm: Lead;
   wide?: boolean;
   onCustomerClear: () => void;
   onCustomerLookup: (search?: string) => void;
   onCustomerSearchChange: (value: string) => void;
-  onCustomerSelect: (customer: CustomerMaster) => void;
+  onCustomerSelect: (customer: BusinessParty) => void;
   onLeadFormChange: (lead: Lead) => void;
 }) {
   const spanClass = wide ? "md:col-span-2" : "";
   const hasSelectedCustomer = Boolean(leadForm.customerId);
-  const customerTypeValue = leadForm.customerType || "Commercial";
-  const customerTypeSelectOptions = customerTypeOptions.includes(customerTypeValue) ? customerTypeOptions : [customerTypeValue, ...customerTypeOptions];
+  const customerTypeValue = leadForm.customerType === undefined ? "" : String(leadForm.customerType);
 
   return (
     <>
@@ -774,15 +785,15 @@ function LeadCustomerEntryFields({
               </div>
             ) : null}
             {!customerLookupLoading
-              ? customers.map((customer) => (
+              ? customers.map((businessParty) => (
                   <button
                     className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-3 text-left text-sm transition hover:border-[color:var(--brand-border)] hover:bg-[color:var(--brand-tint)]"
-                    key={customer.id}
-                    onClick={() => onCustomerSelect(customer)}
+                    key={businessParty.id}
+                    onClick={() => onCustomerSelect(businessParty)}
                     type="button"
                   >
-                    <p className="font-semibold text-[color:var(--brand-strong)]">{customer.customerName}</p>
-                    <p className="mt-1 text-[color:var(--foreground-muted)]">{[customer.customerCode, customer.mobileNo || customer.phoneNo, customer.email, customer.vatRegistrationNo].filter(Boolean).join(" | ")}</p>
+                    <p className="font-semibold text-[color:var(--brand-strong)]">{businessParty.name ?? businessParty.legalName}</p>
+                    <p className="mt-1 text-[color:var(--foreground-muted)]">{[businessParty.externalId, businessParty.contactNumber, businessParty.email, businessParty.gstin].filter(Boolean).join(" | ")}</p>
                   </button>
                 ))
               : null}
@@ -791,7 +802,20 @@ function LeadCustomerEntryFields({
         </div>
       ) : null}
 
-      <Select label="Customer type" value={customerTypeValue} options={customerTypeSelectOptions} onChange={(value) => onLeadFormChange({ ...leadForm, customerType: value })} disabled={hasSelectedCustomer} />
+      <CodeValueSelect
+        label="Customer type"
+        value={customerTypeValue}
+        options={customerTypeOptions}
+        onChange={(value) => {
+          const selectedType = customerTypeOptions.find((option) => String(option.id) === value);
+          onLeadFormChange({
+            ...leadForm,
+            customerType: numericOptionValue(value),
+            customerTypeName: selectedType?.value,
+          });
+        }}
+        disabled={hasSelectedCustomer}
+      />
       <Field label="Mobile no" value={leadForm.mobileNo ?? ""} onChange={(value) => onLeadFormChange({ ...leadForm, mobileNo: value })} disabled={hasSelectedCustomer} required />
       <Field label="Email" type="email" value={leadForm.email ?? ""} onChange={(value) => onLeadFormChange({ ...leadForm, email: value })} disabled={hasSelectedCustomer} />
       <Select label="Preferred contact" value={leadForm.preferredContactMethod ?? "WhatsApp"} options={preferredContactOptions} onChange={(value) => onLeadFormChange({ ...leadForm, preferredContactMethod: value })} />
@@ -805,6 +829,7 @@ function StageMoveDialog({
   lead,
   notes,
   prospectDetails,
+  customerTypeOptions,
   saving,
   score,
   target,
@@ -818,6 +843,7 @@ function StageMoveDialog({
   lead: Lead | null;
   notes: string;
   prospectDetails: ProspectDetails;
+  customerTypeOptions: ErpCodeValue[];
   saving: boolean;
   score: string;
   target: LeadStageTarget;
@@ -861,11 +887,14 @@ function StageMoveDialog({
           {needsCustomerDetails ? (
             <div className="grid gap-4 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4 sm:grid-cols-2">
               <p className="text-sm font-semibold text-[color:var(--brand-strong)] sm:col-span-2">Customer details</p>
-              <Select
+              <CodeValueSelect
                 label="Customer type"
-                value={prospectDetails.customerType}
+                value={prospectDetails.customerType === undefined ? "" : String(prospectDetails.customerType)}
                 options={customerTypeOptions}
-                onChange={(value) => onProspectDetailsChange({ ...prospectDetails, customerType: value })}
+                onChange={(value) => {
+                  const selectedType = customerTypeOptions.find((option) => String(option.id) === value);
+                  onProspectDetailsChange({ ...prospectDetails, customerType: numericOptionValue(value), customerTypeName: selectedType?.value });
+                }}
               />
               <Field
                 label="Customer name"
@@ -973,6 +1002,22 @@ function Select({ label, value, options, onChange, disabled = false }: { label: 
   );
 }
 
+function CodeValueSelect({ label, value, options, onChange, disabled = false }: { label: string; value: string; options: ErpCodeValue[]; onChange: (value: string) => void; disabled?: boolean }) {
+  return (
+    <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
+      {label}
+      <select className="field rounded-lg px-3 py-3 text-sm disabled:cursor-not-allowed disabled:bg-[color:var(--surface-muted)] disabled:text-[color:var(--foreground-muted)]" disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Select {label.toLowerCase()}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.value}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function SubmitButton({ saving, label, disabled = false }: { saving: boolean; label: string; disabled?: boolean }) {
   return (
     <button className="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold disabled:opacity-50" disabled={saving || disabled} type="submit">
@@ -1000,6 +1045,27 @@ function StatusPill({ status }: { status?: string }) {
 
 function SmallPill({ label }: { label: string }) {
   return <span className="pill rounded-full px-3 py-1 text-xs font-semibold">{formatLabel(label)}</span>;
+}
+
+function customerTypeIdFromBusinessParty(businessParty: BusinessParty, customerTypes: ErpCodeValue[]) {
+  const firmType = numericOptionValue(businessParty.typeOfFirm);
+  if (firmType !== undefined) {
+    return firmType;
+  }
+  const numericType = numericOptionValue(businessParty.type);
+  if (numericType !== undefined) {
+    return numericType;
+  }
+  const typeName = businessParty.typeOfBusinessName?.trim().toLowerCase();
+  if (!typeName) {
+    return undefined;
+  }
+  return customerTypes.find((option) => option.value.trim().toLowerCase() === typeName)?.id;
+}
+
+function numericOptionValue(value: unknown) {
+  const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
 }
 
 function isLeadConvertedToProspect(lead: Lead) {

@@ -9,7 +9,8 @@ export type Lead = {
   leadNo?: string;
   customerId?: number;
   customerCode?: string;
-  customerType?: string;
+  customerType?: number;
+  customerTypeName?: string;
   customerName: string;
   contactPerson?: string;
   mobileNo: string;
@@ -25,24 +26,35 @@ export type Lead = {
   updatedOn?: string;
 };
 
-export type CustomerMaster = {
+export type ErpCodeValue = {
+  id: number;
+  codeId?: number;
+  codeType?: string;
+  clientId?: number;
+  companyId?: number;
+  category?: string;
+  externalId?: string;
+  value: string;
+  sort?: number;
+  level?: string;
+};
+
+export type BusinessParty = {
   id: number;
   companyId?: number;
-  customerCode?: string;
-  customerType?: string;
-  customerName: string;
-  tradeLicenseNo?: string;
-  crNumber?: string;
-  vatRegistrationNo?: string;
-  contactPerson?: string;
-  contactRole?: string;
-  contactTitle?: string;
-  mobileNo?: string;
-  phoneNo?: string;
+  externalId?: string;
+  name: string;
+  legalName?: string;
+  type?: string;
+  partyId?: number;
+  partyType?: number;
+  typeOfFirm?: number;
+  typeOfBusinessName?: string;
+  gstin?: string;
+  pan?: string;
+  contactNumber?: string;
   email?: string;
-  preferredContactMethod?: string;
-  faxNo?: string;
-  address?: string;
+  addressLine?: string;
   status?: string;
   createdBy?: number;
   createdOn?: string;
@@ -57,17 +69,27 @@ export async function listLeads() {
   return request<Lead[]>(`/leads${companyId ? `?companyId=${companyId}` : ""}`);
 }
 
+export async function listCustomers() {
+  return searchCustomers("");
+}
+
+export async function listCodeValues(codeType: string) {
+  const params = new URLSearchParams();
+  params.set("codeType", codeType);
+  return request<ErpCodeValue[]>(`/erp-code-values?${params.toString()}`);
+}
+
 export async function searchCustomers(search: string) {
   const companyId = selectedCompanyId();
-  const params = new URLSearchParams();
-  if (companyId) {
-    params.set("companyId", String(companyId));
+  if (!companyId) {
+    throw new Error("Select a company before searching business parties.");
   }
+  const params = new URLSearchParams();
+  params.set("companyId", String(companyId));
   if (search.trim()) {
     params.set("search", search.trim());
   }
-  const query = params.toString();
-  return request<CustomerMaster[]>(`/customers${query ? `?${query}` : ""}`);
+  return request<BusinessParty[]>(`/customers?${params.toString()}`);
 }
 
 export async function createLead(payload: Lead) {
@@ -84,7 +106,7 @@ export async function qualifyLead(id: number, payload: { score: number; notes?: 
 
 export async function convertLeadToProspect<T>(id: number, createdBy?: number, payload?: unknown) {
   const userId = createdBy ?? loggedUserId();
-  return request<T>(`/leads/${id}/convert-to-prospect${userId ? `?createdBy=${userId}` : ""}`, { method: "POST", body: payload });
+  return request<T>(`/leads/${id}/convert-to-prospect${userId ? `?createdBy=${userId}` : ""}`, { method: "POST", body: payload ?? {} });
 }
 
 async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -128,9 +150,12 @@ function selectedCompanyId(): number | undefined {
   if (!rawCompany) {
     return undefined;
   }
-  const company = JSON.parse(rawCompany) as { companyId?: number; id?: string | number };
-  const value = company.companyId ?? Number(company.id);
-  return Number.isFinite(value) ? Number(value) : undefined;
+  try {
+    const company = JSON.parse(rawCompany) as { companyId?: unknown; selectedCompanyId?: unknown; id?: unknown };
+    return numericValue(company.companyId ?? company.selectedCompanyId ?? company.id);
+  } catch {
+    return undefined;
+  }
 }
 
 function loggedUserId(): number | undefined {

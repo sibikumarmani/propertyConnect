@@ -16,9 +16,7 @@ public class CorsResponseFilter implements ContainerRequestFilter, ContainerResp
 
 	private static final Set<String> ALLOWED_ORIGINS = Set.of(
 			"http://localhost:3000",
-			"http://127.0.0.1:3000",
-			"http://localhost:3001",
-			"http://127.0.0.1:3001");
+			"http://127.0.0.1:3000");
 	private static final String ALLOWED_HEADERS = "Content-Type,Authorization,X-Company-Id";
 
 	@Override

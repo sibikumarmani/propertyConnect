@@ -1,14 +1,20 @@
 package com.eba.propertyconnect.propertymanagement.leasing.service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import org.mybatis.cdi.Transactional;
 
+import com.eba.propertyconnect.propertymanagement.integration.coreconnect.service.ErpCodeValueService;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.ApprovalRequest;
-import com.eba.propertyconnect.propertymanagement.leasing.domain.Customer;
+import com.eba.propertyconnect.propertymanagement.leasing.domain.BusinessParty;
+import com.eba.propertyconnect.propertymanagement.leasing.domain.ErpCodeValue;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Lead;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Offer;
@@ -23,7 +29,6 @@ import com.eba.propertyconnect.propertymanagement.leasing.domain.ReservationStat
 import com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Unit;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.UnitSearch;
-import com.eba.propertyconnect.propertymanagement.leasing.mapper.CustomerMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.LeadMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.NegotiationMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.OfferMapper;
@@ -34,7 +39,11 @@ import com.eba.propertyconnect.propertymanagement.leasing.mapper.ReservationMapp
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.SiteVisitMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.StatusHistoryMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.UnitMapper;
+import com.eba.propertyconnect.propertymanagement.integration.coreconnect.client.CoreConnectAuthSoapClient;
 import com.eba.propertyconnect.propertymanagement.util.CacheHelper;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -43,12 +52,16 @@ import jakarta.inject.Inject;
 public class LeasingService {
 
 	private static final String LEASING_CACHE_SCOPE = "leasing";
+	private static final String FIRM_TYPE_CODE_TYPE = "cf_firm_type";
 
 	@Inject
 	private LeadMapper leadMapper;
 
 	@Inject
-	private CustomerMapper customerMapper;
+	private CoreConnectAuthSoapClient erpClient;
+
+	@Inject
+	private ErpCodeValueService erpCodeValueService;
 
 	@Inject
 	private ProspectMapper prospectMapper;
@@ -77,20 +90,35 @@ public class LeasingService {
 	@Inject
 	private StatusHistoryMapper statusHistoryMapper;
 
-	public List<Lead> listLeads(Long companyId) {
+	public List<Lead> listLeads(Long companyId, Long clientId, Long selectedCompanyId) {
+		List<Lead> leads;
 		if (companyId != null) {
-			return leadMapper.listLeads(companyId);
+			leads = leadMapper.listLeads(companyId);
 		}
-		return getCompanyCache(CacheHelper.GET_LEASING_LEADS, () -> leadMapper.listLeads(null));
+		else {
+			leads = getCompanyCache(CacheHelper.GET_LEASING_LEADS, () -> leadMapper.listLeads(null));
+		}
+		applyCustomerTypeValues(leads, clientId, firstLong(selectedCompanyId, companyId));
+		return leads;
 	}
 
-	public List<Customer> searchCustomers(Long companyId, String search) {
-		return customerMapper.searchCustomers(companyId, search == null ? null : search.trim());
+	public List<BusinessParty> searchCustomers(Long companyId, String search) {
+		if (companyId == null) {
+			return List.of();
+		}
+		String filter = search == null ? null : search.trim();
+		List<BusinessParty> matches = new ArrayList<>();
+		for (BusinessParty businessParty : erpCustomers(companyId)) {
+			if (matchesCustomerSearch(businessParty, filter)) {
+				matches.add(businessParty);
+			}
+		}
+		return matches;
 	}
 
 	public Lead createLead(Lead request) {
 		requireId(request.companyId, "Company is required");
-		applyCustomerMaster(request);
+		applyBusinessParty(request);
 		Lead lead = request;
 		lead.leadNo = defaultString(lead.leadNo, nextNumber("LD"));
 		lead.status = defaultString(lead.status, "NEW");
@@ -109,7 +137,7 @@ public class LeasingService {
 		}
 		Lead lead = request;
 		lead.id = leadId;
-		applyCustomerMaster(lead);
+		applyBusinessParty(lead);
 		leadMapper.updateLead(lead);
 		clearLeasingCache();
 		return leadMapper.getLead(leadId);
@@ -163,32 +191,32 @@ public class LeasingService {
 			throw new IllegalArgumentException("Lead not found");
 		}
 		if (lead.customerId == null && request == null) {
-			throw new IllegalArgumentException("Customer details are required before converting this lead to prospect");
+			throw new IllegalArgumentException("BusinessParty details are required before converting this lead to prospect");
 		}
 		if (lead.customerId == null) {
 			applyCustomerDetailsForConversion(lead, request, createdBy);
 		}
-		Customer customer = lead.customerId == null ? null : customerMapper.getCustomer(lead.customerId);
+		BusinessParty businessParty = lead.customerId == null ? null : findCustomer(lead.companyId, lead.customerId);
 		Prospect prospect = new Prospect();
 		prospect.companyId = lead.companyId;
 		prospect.leadId = leadId;
 		prospect.prospectNo = nextNumber("PR");
 		prospect.customerId = lead.customerId;
 		prospect.customerCode = lead.customerCode;
-		prospect.customerType = firstText(request == null ? null : request.customerType, lead.customerType);
+		prospect.customerType = firstInteger(request == null ? null : request.customerType, lead.customerType);
 		prospect.customerName = firstText(request == null ? null : request.customerName, lead.customerName);
-		prospect.tradeLicenseNo = firstText(request == null ? null : request.tradeLicenseNo, customer == null ? null : customer.tradeLicenseNo);
-		prospect.crNumber = firstText(request == null ? null : request.crNumber, customer == null ? null : customer.crNumber);
-		prospect.vatRegistrationNo = firstText(request == null ? null : request.vatRegistrationNo, customer == null ? null : customer.vatRegistrationNo);
+		prospect.tradeLicenseNo = request == null ? null : request.tradeLicenseNo;
+		prospect.crNumber = firstText(request == null ? null : request.crNumber, businessParty == null ? null : businessParty.pan);
+		prospect.vatRegistrationNo = firstText(request == null ? null : request.vatRegistrationNo, businessParty == null ? null : businessParty.gstin);
 		prospect.contactPerson = firstText(request == null ? null : request.contactPerson, lead.contactPerson);
-		prospect.contactRole = firstText(request == null ? null : request.contactRole, customer == null ? null : customer.contactRole);
-		prospect.contactTitle = firstText(request == null ? null : request.contactTitle, customer == null ? null : customer.contactTitle);
+		prospect.contactRole = request == null ? null : request.contactRole;
+		prospect.contactTitle = request == null ? null : request.contactTitle;
 		prospect.mobileNo = firstText(request == null ? null : request.mobileNo, lead.mobileNo);
-		prospect.phoneNo = firstText(request == null ? null : request.phoneNo, customer == null ? null : customer.phoneNo);
+		prospect.phoneNo = firstText(request == null ? null : request.phoneNo, businessParty == null ? null : businessParty.contactNumber);
 		prospect.email = firstText(request == null ? null : request.email, lead.email);
 		prospect.preferredContactMethod = firstText(request == null ? null : request.preferredContactMethod, lead.preferredContactMethod);
-		prospect.faxNo = firstText(request == null ? null : request.faxNo, customer == null ? null : customer.faxNo);
-		prospect.address = firstText(request == null ? null : request.address, customer == null ? null : customer.address);
+		prospect.faxNo = request == null ? null : request.faxNo;
+		prospect.address = firstText(request == null ? null : request.address, businessParty == null ? null : businessParty.addressLine);
 		prospect.source = request == null ? null : request.source;
 		prospect.purpose = firstText(request == null ? null : request.purpose, lead.purpose);
 		prospect.commercialNeed = request == null ? null : request.commercialNeed;
@@ -225,7 +253,7 @@ public class LeasingService {
 		if (existingProspect == null) {
 			throw new IllegalArgumentException("Prospect not found");
 		}
-		requireText(request.customerName, "Customer name is required");
+		requireText(request.customerName, "BusinessParty name is required");
 		requireText(request.mobileNo, "Mobile number is required");
 		request.id = prospectId;
 		prospectMapper.updateProspect(request);
@@ -814,61 +842,149 @@ public class LeasingService {
 		return 0;
 	}
 
-	private void applyCustomerMaster(Lead lead) {
+	private void applyBusinessParty(Lead lead) {
 		if (lead.customerId == null) {
-			requireText(lead.customerName, "Customer name is required");
+			requireText(lead.customerName, "BusinessParty name is required");
 			requireText(lead.mobileNo, "Mobile number is required");
 			lead.customerCode = null;
 			return;
 		}
-		requireId(lead.customerId, "Customer is required");
-		Customer customer = customerMapper.getCustomer(lead.customerId);
-		if (customer == null) {
-			throw new IllegalArgumentException("Customer not found");
+		requireId(lead.customerId, "BusinessParty is required");
+		BusinessParty businessParty = findCustomer(lead.companyId, lead.customerId);
+		if (businessParty == null) {
+			throw new IllegalArgumentException("BusinessParty not found");
 		}
-		if (customer.companyId != null && lead.companyId != null && !customer.companyId.equals(lead.companyId)) {
-			throw new IllegalArgumentException("Customer does not belong to selected company");
+		if (businessParty.companyId != null && lead.companyId != null && !businessParty.companyId.equals(lead.companyId)) {
+			throw new IllegalArgumentException("BusinessParty does not belong to selected company");
 		}
-		lead.customerCode = customer.customerCode;
-		lead.customerType = customer.customerType;
-		lead.customerName = customer.customerName;
-		lead.contactPerson = customer.contactPerson;
-		lead.mobileNo = customer.mobileNo;
-		lead.email = customer.email;
-		lead.preferredContactMethod = customer.preferredContactMethod;
+		lead.customerCode = businessParty.externalId;
+		lead.customerType = firstInteger(businessParty.typeOfFirm, toInteger(businessParty.type));
+		lead.customerTypeName = businessParty.typeOfBusinessName;
+		lead.customerName = firstText(businessParty.name, businessParty.legalName);
+		lead.contactPerson = businessParty.legalName;
+		lead.mobileNo = businessParty.contactNumber;
+		lead.email = businessParty.email;
+	}
+
+	private BusinessParty findCustomer(Long companyId, Long customerId) {
+		requireId(customerId, "BusinessParty is required");
+		if (companyId != null) {
+			for (BusinessParty businessParty : erpCustomers(companyId)) {
+				if (customerId.equals(businessParty.id)) {
+					return businessParty;
+				}
+			}
+		}
+		return null;
+	}
+
+	private List<BusinessParty> erpCustomers(Long companyId) {
+		JsonArray values = erpClient.getCustomer(companyId);
+		List<BusinessParty> businessParties = new ArrayList<>();
+		for (JsonElement value : values) {
+			if (value != null && value.isJsonObject()) {
+				businessParties.add(toBusinessParty(companyId, value.getAsJsonObject()));
+			}
+		}
+		return businessParties;
+	}
+
+	private BusinessParty toBusinessParty(Long selectedCompanyId, JsonObject source) {
+		BusinessParty businessParty = new BusinessParty();
+		businessParty.id = firstLong(source, "id");
+		businessParty.companyId = firstLong(source, "companyId");
+		if (businessParty.companyId == null) {
+			businessParty.companyId = selectedCompanyId;
+		}
+		businessParty.externalId = firstString(source, "externalId");
+		businessParty.name = firstString(source, "name");
+		businessParty.legalName = firstString(source, "legalName");
+		businessParty.type = firstString(source, "type");
+		businessParty.typeOfFirm = firstInteger(source, "typeOfFirm");
+		businessParty.partyId = firstLong(source, "partyId");
+		businessParty.partyType = firstLong(source, "partyType");
+		businessParty.typeOfBusinessName = firstString(source, "typeOfBusinessName");
+		businessParty.gstin = firstString(source, "gstin");
+		businessParty.pan = firstString(source, "pan");
+		businessParty.contactNumber = firstString(source, "contactNumber");
+		businessParty.email = firstString(source, "email");
+		businessParty.addressLine = firstString(source, "addressLine");
+		businessParty.status = firstString(source, "status");
+		JsonObject communication = firstObject(source, "communication");
+		if (communication != null) {
+			businessParty.contactNumber = firstText(businessParty.contactNumber, firstString(communication, "mobile1", "phone1", "workPhone"));
+			businessParty.email = firstText(businessParty.email, firstString(communication, "email1", "workEmail"));
+		}
+		return businessParty;
+	}
+
+	private boolean matchesCustomerSearch(BusinessParty businessParty, String search) {
+		if (!hasText(search)) {
+			return true;
+		}
+		String query = search.toLowerCase(Locale.ROOT);
+		return contains(businessParty.name, query)
+				|| contains(businessParty.legalName, query)
+				|| contains(businessParty.externalId, query)
+				|| contains(businessParty.contactNumber, query)
+				|| contains(businessParty.email, query)
+				|| contains(businessParty.gstin, query)
+				|| contains(businessParty.pan, query);
+	}
+
+	private boolean contains(String value, String query) {
+		return value != null && value.toLowerCase(Locale.ROOT).contains(query);
+	}
+
+	private void applyCustomerTypeValues(List<Lead> leads, Long clientId, Long companyId) {
+		if (leads == null || leads.isEmpty()) {
+			return;
+		}
+		List<ErpCodeValue> firmTypes = erpCodeValueService.listCodeValues(FIRM_TYPE_CODE_TYPE, clientId, companyId);
+		Map<String, String> firmTypeLookup = codeValueLookup(firmTypes);
+		for (Lead lead : leads) {
+			Integer customerType = lead.customerType;
+			if (customerType == null) {
+				continue;
+			}
+			String displayValue = firmTypeLookup.get(customerType.toString());
+			if (displayValue != null) {
+				lead.customerTypeName = displayValue;
+			}
+		}
+	}
+
+	private Map<String, String> codeValueLookup(List<ErpCodeValue> codeValues) {
+		Map<String, String> lookup = new HashMap<>();
+		for (ErpCodeValue codeValue : codeValues) {
+			if (!hasText(codeValue.value)) {
+				continue;
+			}
+			putCodeValueLookup(lookup, codeValue.id == null ? null : codeValue.id.toString(), codeValue.value);
+			putCodeValueLookup(lookup, codeValue.externalId, codeValue.value);
+			putCodeValueLookup(lookup, codeValue.value, codeValue.value);
+		}
+		return lookup;
+	}
+
+	private void putCodeValueLookup(Map<String, String> lookup, String key, String value) {
+		if (hasText(key)) {
+			lookup.put(key.trim().toLowerCase(Locale.ROOT), value);
+		}
 	}
 
 	private void applyCustomerDetailsForConversion(Lead lead, Prospect request, Long createdBy) {
-		requireText(request.customerName, "Customer name is required");
+		requireText(request.customerName, "BusinessParty name is required");
 		requireText(request.mobileNo, "Mobile number is required");
-		Customer customer = new Customer();
-		customer.companyId = lead.companyId;
-		customer.customerCode = nextNumber("CU");
-		customer.customerType = defaultString(request.customerType, defaultString(lead.customerType, "Commercial"));
-		customer.customerName = request.customerName;
-		customer.tradeLicenseNo = request.tradeLicenseNo;
-		customer.crNumber = request.crNumber;
-		customer.vatRegistrationNo = request.vatRegistrationNo;
-		customer.contactPerson = firstText(request.contactPerson, lead.contactPerson);
-		customer.contactRole = request.contactRole;
-		customer.contactTitle = request.contactTitle;
-		customer.mobileNo = request.mobileNo;
-		customer.phoneNo = request.phoneNo;
-		customer.email = firstText(request.email, lead.email);
-		customer.preferredContactMethod = firstText(request.preferredContactMethod, lead.preferredContactMethod);
-		customer.faxNo = request.faxNo;
-		customer.address = request.address;
-		customer.status = "ACTIVE";
-		customer.createdBy = createdBy;
-		customerMapper.createCustomer(customer);
-		lead.customerId = customer.id;
-		lead.customerCode = customer.customerCode;
-		lead.customerType = customer.customerType;
-		lead.customerName = customer.customerName;
-		lead.contactPerson = customer.contactPerson;
-		lead.mobileNo = customer.mobileNo;
-		lead.email = customer.email;
-		lead.preferredContactMethod = customer.preferredContactMethod;
+		lead.customerId = null;
+		lead.customerCode = null;
+		lead.customerType = firstInteger(request.customerType, lead.customerType);
+		lead.customerTypeName = request.customerTypeName;
+		lead.customerName = request.customerName;
+		lead.contactPerson = firstText(request.contactPerson, lead.contactPerson);
+		lead.mobileNo = request.mobileNo;
+		lead.email = firstText(request.email, lead.email);
+		lead.preferredContactMethod = firstText(request.preferredContactMethod, lead.preferredContactMethod);
 		lead.updatedBy = createdBy;
 		leadMapper.updateLead(lead);
 	}
@@ -949,5 +1065,128 @@ public class LeasingService {
 
 	private String firstText(String preferred, String fallback) {
 		return hasText(preferred) ? preferred : fallback;
+	}
+
+	private Long firstLong(JsonObject source, String... names) {
+		if (source == null) {
+			return null;
+		}
+		for (String name : names) {
+			if (source.has(name) && !source.get(name).isJsonNull()) {
+				try {
+					String value = textValue(source.get(name));
+					if (hasText(value)) {
+						return Long.valueOf(value);
+					}
+				}
+				catch (NumberFormatException ex) {
+					continue;
+				}
+			}
+		}
+		return null;
+	}
+
+	private Long firstLong(Long... values) {
+		for (Long value : values) {
+			if (value != null) {
+				return value;
+			}
+		}
+		return null;
+	}
+
+	private Integer firstInteger(JsonObject source, String... names) {
+		if (source == null) {
+			return null;
+		}
+		for (String name : names) {
+			if (source.has(name) && !source.get(name).isJsonNull()) {
+				try {
+					String value = numericTextValue(source.get(name));
+					if (hasText(value)) {
+						return Integer.valueOf(value);
+					}
+				}
+				catch (NumberFormatException ex) {
+					continue;
+				}
+			}
+		}
+		return null;
+	}
+
+	private Integer firstInteger(Integer... values) {
+		for (Integer value : values) {
+			if (value != null) {
+				return value;
+			}
+		}
+		return null;
+	}
+
+	private String numericTextValue(JsonElement value) {
+		if (value == null || value.isJsonNull()) {
+			return null;
+		}
+		if (value.isJsonPrimitive()) {
+			return value.getAsString();
+		}
+		if (value.isJsonObject()) {
+			return firstString(value.getAsJsonObject(), "id", "value", "code", "externalId");
+		}
+		return null;
+	}
+
+	private Integer toInteger(String value) {
+		if (!hasText(value)) {
+			return null;
+		}
+		try {
+			return Integer.valueOf(value.trim());
+		}
+		catch (NumberFormatException ex) {
+			return null;
+		}
+	}
+
+	private String firstString(JsonObject source, String... names) {
+		if (source == null) {
+			return null;
+		}
+		for (String name : names) {
+			if (source.has(name) && !source.get(name).isJsonNull()) {
+				String value = textValue(source.get(name));
+				if (hasText(value)) {
+					return value;
+				}
+			}
+		}
+		return null;
+	}
+
+	private String textValue(JsonElement value) {
+		if (value == null || value.isJsonNull()) {
+			return null;
+		}
+		if (value.isJsonPrimitive()) {
+			return value.getAsString();
+		}
+		if (value.isJsonObject()) {
+			return firstString(value.getAsJsonObject(), "name", "value", "code", "description", "label", "text");
+		}
+		return null;
+	}
+
+	private JsonObject firstObject(JsonObject source, String... names) {
+		if (source == null) {
+			return null;
+		}
+		for (String name : names) {
+			if (source.has(name) && source.get(name).isJsonObject()) {
+				return source.getAsJsonObject(name);
+			}
+		}
+		return null;
 	}
 }

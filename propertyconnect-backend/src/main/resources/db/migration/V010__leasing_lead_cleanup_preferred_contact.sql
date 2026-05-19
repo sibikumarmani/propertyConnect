@@ -54,7 +54,6 @@ DELIMITER ;
 
 CALL pc_add_leasing_column('pa_txn_leasing_lead', 'preferred_contact_method', 'ALTER TABLE pa_txn_leasing_lead ADD COLUMN preferred_contact_method VARCHAR(40) NULL AFTER email');
 CALL pc_add_leasing_column('pa_txn_leasing_prospect', 'preferred_contact_method', 'ALTER TABLE pa_txn_leasing_prospect ADD COLUMN preferred_contact_method VARCHAR(40) NULL AFTER email');
-CALL pc_add_leasing_column('pa_mst_customer', 'preferred_contact_method', 'ALTER TABLE pa_mst_customer ADD COLUMN preferred_contact_method VARCHAR(40) NULL AFTER email');
 
 CALL pc_drop_leasing_index('pa_txn_leasing_lead', 'idx_pa_txn_leasing_lead_commercial_ids', 'ALTER TABLE pa_txn_leasing_lead DROP INDEX idx_pa_txn_leasing_lead_commercial_ids');
 

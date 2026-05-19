@@ -3,7 +3,7 @@
 import { Building2, Check, ChevronRight, LogOut } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { selectCompany, type CompanyMapping } from "@/lib/auth";
+import { getSession, selectCompany, type CompanyMapping } from "@/lib/auth";
 
 const tokenKey = "propertyConnect.authToken";
 const userKey = "propertyConnect.user";
@@ -25,15 +25,32 @@ export function CompanySelection() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const timerId = window.setTimeout(() => {
-      const storage = getAuthStorage();
+    const timerId = window.setTimeout(async () => {
+      const storage = getAuthStorage() ?? sessionStorage;
 
-      if (!storage) {
-        window.location.replace(loginPath);
-        return;
+      try {
+        const session = await getSession();
+        if (!session.authenticated) {
+          throw new Error("Please sign in again.");
+        }
+        if (session.user) {
+          storage.setItem(userKey, JSON.stringify(session.user));
+        }
+        if (session.companies?.length) {
+          storage.setItem(companiesKey, JSON.stringify(session.companies));
+        }
+        if (session.userProfile) {
+          storage.setItem(userProfileKey, JSON.stringify(session.userProfile));
+        }
+      } catch {
+        if (!storage.getItem(tokenKey)) {
+          window.location.replace(loginPath);
+          return;
+        }
       }
 
-      if (storage.getItem(selectedCompanyKey)) {
+      const selectedCompany = readStoredObject<CompanyMapping>(storage, selectedCompanyKey);
+      if (selectedCompany) {
         window.location.replace(dashboardPath);
         return;
       }
@@ -237,6 +254,14 @@ function getAuthStorage() {
   }
 
   if (sessionStorage.getItem(tokenKey)) {
+    return sessionStorage;
+  }
+
+  if (localStorage.getItem(companiesKey)) {
+    return localStorage;
+  }
+
+  if (sessionStorage.getItem(companiesKey)) {
     return sessionStorage;
   }
 

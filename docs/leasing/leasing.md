@@ -95,7 +95,6 @@ Keep each domain object in its own Java file.
 
 | Table | Purpose |
 |---|---|
-| `pa_mst_customer` | Commercial customer master |
 | `pa_mst_unit` | Unit master and availability |
 | `pa_txn_leasing_lead` | Initial enquiry |
 | `pa_txn_leasing_prospect` | Qualified opportunity |

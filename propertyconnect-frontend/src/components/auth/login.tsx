@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { login, selectCompany } from "@/lib/auth";
+import { getSession, login, selectCompany } from "@/lib/auth";
 
 const loginSchema = z.object({
   loginId: z.string().min(2, "Enter your login ID"),
@@ -50,20 +50,44 @@ export function Login() {
   });
 
   useEffect(() => {
-    const storage = getAuthStorage();
+    const timerId = window.setTimeout(async () => {
+      const storage = getAuthStorage() ?? sessionStorage;
 
-    if (!storage) {
-      return;
-    }
+      try {
+        const session = await getSession();
+        if (!session.authenticated) {
+          return;
+        }
 
-    if (storage.getItem(selectedCompanyKey)) {
-      window.location.replace(dashboardPath);
-      return;
-    }
+        if (session.user) {
+          storage.setItem(userKey, JSON.stringify(session.user));
+        }
+        if (session.companies?.length) {
+          storage.setItem(companiesKey, JSON.stringify(session.companies));
+        }
+        if (session.userProfile) {
+          storage.setItem(userProfileKey, JSON.stringify(session.userProfile));
+        }
 
-    if (storage.getItem(companiesKey)) {
-      window.location.replace(companySelectionPath);
-    }
+        const selectedCompany =
+          readStoredObject(storage, selectedCompanyKey) ??
+          selectedCompanyFromSession(session.companies ?? [], session.selectedCompanyId);
+
+        if (selectedCompany) {
+          storage.setItem(selectedCompanyKey, JSON.stringify(selectedCompany));
+          window.location.replace(dashboardPath);
+          return;
+        }
+
+        if (storage.getItem(companiesKey)) {
+          window.location.replace(companySelectionPath);
+        }
+      } catch {
+        return;
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timerId);
   }, []);
 
   async function onSubmit(values: LoginFormValues) {
@@ -283,4 +307,27 @@ function getAuthStorage() {
   }
 
   return null;
+}
+
+function selectedCompanyFromSession(companies: Array<{ id: string; companyId?: number }>, selectedCompanyId?: number) {
+  if (!selectedCompanyId) {
+    return null;
+  }
+
+  return companies.find((company) => company.companyId === selectedCompanyId || Number(company.id) === selectedCompanyId) ?? null;
+}
+
+function readStoredObject(storage: Storage, key: string): Record<string, unknown> | null {
+  const rawValue = storage.getItem(key);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }

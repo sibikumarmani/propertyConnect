@@ -3,6 +3,7 @@ package com.eba.propertyconnect.propertymanagement.leasing.controller;
 import java.time.LocalDate;
 
 import com.eba.propertyconnect.propertymanagement.auth.service.TokenService;
+import com.eba.propertyconnect.propertymanagement.integration.coreconnect.service.ErpCodeValueService;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.ApprovalRequest;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Lead;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Negotiation;
@@ -45,6 +46,9 @@ import jakarta.ws.rs.core.Response;
 public class LeasingResource {
 
 	private static final String CORE_USER_ID = "userId";
+	private static final String CORE_CLIENT_ID = "clientId";
+	private static final String CORE_COMPANY_ID = "companyId";
+	private static final String CORE_SELECTED_COMPANY_ID = "selectedCompanyId";
 	private static final Gson GSON = new GsonBuilder()
 			.setDateFormat("yyyy-MM-dd'T'HH:mm:ss")
 			.registerTypeAdapter(LocalDate.class, (com.google.gson.JsonSerializer<LocalDate>) (value, type, context) -> context.serialize(value.toString()))
@@ -52,6 +56,9 @@ public class LeasingResource {
 
 	@Inject
 	private LeasingService service;
+
+	@Inject
+	private ErpCodeValueService erpCodeValueService;
 
 	@Inject
 	private TokenService tokenService;
@@ -66,9 +73,24 @@ public class LeasingResource {
 	}
 
 	@GET
+	@Path("/erp-code-values")
+	public Response listErpCodeValues(
+			@QueryParam("codeType") String codeType,
+			@QueryParam("clientId") Long clientId,
+			@QueryParam("companyId") Long companyId) {
+		return okOrBadRequest(() -> erpCodeValueService.listCodeValues(
+				codeType,
+				firstLong(clientId, longFromSession(CORE_CLIENT_ID)),
+				firstLong(companyId, longFromSession(CORE_SELECTED_COMPANY_ID), longFromSession(CORE_COMPANY_ID))));
+	}
+
+	@GET
 	@Path("/leads")
 	public Response listLeads(@QueryParam("companyId") Long companyId) {
-		return ok(service.listLeads(companyId));
+		return ok(service.listLeads(
+				companyId,
+				firstLong(longFromSession(CORE_CLIENT_ID)),
+				firstLong(longFromSession(CORE_SELECTED_COMPANY_ID), longFromSession(CORE_COMPANY_ID))));
 	}
 
 	@POST
@@ -333,6 +355,23 @@ public class LeasingResource {
 			return null;
 		}
 		return toUserId(session.getAttribute(CORE_USER_ID));
+	}
+
+	private Long longFromSession(String name) {
+		HttpSession session = httpRequest == null ? null : httpRequest.getSession(false);
+		if (session == null) {
+			return null;
+		}
+		return toUserId(session.getAttribute(name));
+	}
+
+	private Long firstLong(Long... values) {
+		for (Long value : values) {
+			if (value != null) {
+				return value;
+			}
+		}
+		return null;
 	}
 
 	private Long userIdFromToken() {

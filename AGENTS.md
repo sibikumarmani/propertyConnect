@@ -17,7 +17,7 @@ This is the main instruction and index file for PropertyConnect. Keep this file 
 | Cache | Apache Commons JCS through `CacheHelper` |
 | Master table prefix | `pa_mst_*` |
 | Transaction table prefix | `pa_txn_*` |
-| Current leasing tables | `pa_mst_customer`, `pa_mst_unit`, `pa_txn_leasing_*` |
+| Current leasing tables | `pa_mst_unit`, `pa_txn_leasing_*` |
 
 ## Main Architecture
 

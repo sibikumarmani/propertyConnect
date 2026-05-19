@@ -7,7 +7,8 @@ public class Lead extends AuditModel {
 	public String leadNo;
 	public Long customerId;
 	public String customerCode;
-	public String customerType;
+	public Integer customerType;
+	public String customerTypeName;
 	public String customerName;
 	public String contactPerson;
 	public String mobileNo;

@@ -8,7 +8,8 @@ public class Prospect extends AuditModel {
 	public String prospectNo;
 	public Long customerId;
 	public String customerCode;
-	public String customerType;
+	public Integer customerType;
+	public String customerTypeName;
 	public String customerName;
 	public String tradeLicenseNo;
 	public String crNumber;

@@ -7,7 +7,9 @@ import com.eba.propertyconnect.propertymanagement.auth.domain.CompanySelectionRe
 import com.eba.propertyconnect.propertymanagement.auth.domain.CompanySelectionResponse;
 import com.eba.propertyconnect.propertymanagement.auth.domain.LoginRequest;
 import com.eba.propertyconnect.propertymanagement.auth.domain.LoginResponse;
+import com.eba.propertyconnect.propertymanagement.auth.domain.SessionResponse;
 import com.eba.propertyconnect.propertymanagement.auth.service.LoginService;
+import com.eba.propertyconnect.propertymanagement.auth.service.TokenService;
 import com.eba.propertyconnect.propertymanagement.exception.AuthenticationException;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -18,6 +20,7 @@ import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -63,6 +66,9 @@ public class AuthResource {
 	@Inject
 	private LoginService loginService;
 
+	@Inject
+	private TokenService tokenService;
+
 	@Context
 	private HttpServletRequest httpRequest;
 
@@ -86,6 +92,9 @@ public class AuthResource {
 	@POST
 	@Path("/company")
 	public Response validateCompany(CompanySelectionRequest request) {
+		if (!hasAuthenticatedSessionOrToken()) {
+			return Response.status(Response.Status.UNAUTHORIZED).entity(error("Please sign in again.")).build();
+		}
 		try {
 			CompanySelectionResponse response = loginService.validateCompany(request);
 			HttpSession session = httpRequest.getSession(true);
@@ -102,10 +111,85 @@ public class AuthResource {
 		}
 	}
 
+	@GET
+	@Path("/session")
+	public Response session() {
+		HttpSession session = httpRequest.getSession(false);
+		if (session != null && session.getAttribute(SESSION_USER) instanceof com.eba.propertyconnect.propertymanagement.auth.domain.AuthenticatedUser user) {
+			SessionResponse response = new SessionResponse(
+					true,
+					user,
+					companiesFromSession(session),
+					userProfileFromSession(session),
+					integerFromSession(session, SESSION_SELECTED_COMPANY_ID));
+			return Response.ok(GSON.toJson(response)).build();
+		}
+
+		com.eba.propertyconnect.propertymanagement.auth.domain.AuthenticatedUser tokenUser =
+				tokenService.authenticatedUser(httpRequest.getHeader("Authorization"));
+		if (tokenUser == null) {
+			return Response.status(Response.Status.UNAUTHORIZED).entity(error("Please sign in again.")).build();
+		}
+
+		SessionResponse response = new SessionResponse(true, tokenUser, List.of(), null, null);
+		return Response.ok(GSON.toJson(response)).build();
+	}
+
+	@POST
+	@Path("/logout")
+	public Response logout() {
+		HttpSession session = httpRequest.getSession(false);
+		if (session != null) {
+			session.invalidate();
+		}
+		return Response.noContent().build();
+	}
+
 	private String error(String message) {
 		JsonObject error = new JsonObject();
 		error.addProperty("message", message);
 		return GSON.toJson(error);
+	}
+
+	private boolean hasAuthenticatedSessionOrToken() {
+		HttpSession session = httpRequest.getSession(false);
+		if (session != null && session.getAttribute(SESSION_USER) != null) {
+			return true;
+		}
+		return tokenService.authenticatedUserId(httpRequest.getHeader("Authorization")) != null;
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<CompanyMapping> companiesFromSession(HttpSession session) {
+		Object companies = session.getAttribute(SESSION_COMPANIES);
+		if (companies instanceof List<?>) {
+			return (List<CompanyMapping>) companies;
+		}
+		return List.of();
+	}
+
+	private JsonObject userProfileFromSession(HttpSession session) {
+		Object profile = session.getAttribute(SESSION_USER_PROFILE);
+		return profile instanceof JsonObject ? (JsonObject) profile : null;
+	}
+
+	private Integer integerFromSession(HttpSession session, String name) {
+		Object value = session.getAttribute(name);
+		if (value instanceof Integer integerValue) {
+			return integerValue;
+		}
+		if (value instanceof Number numberValue) {
+			return numberValue.intValue();
+		}
+		if (value instanceof String stringValue) {
+			try {
+				return Integer.valueOf(stringValue);
+			}
+			catch (NumberFormatException ex) {
+				return null;
+			}
+		}
+		return null;
 	}
 
 	private void storeLoginSession(HttpSession session, LoginResponse response) {

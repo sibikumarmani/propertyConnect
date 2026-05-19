@@ -8,6 +8,7 @@ import { Sparkles } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppTopBar, type WorkspaceCompany, type WorkspaceUser } from "@/components/layout/app-top-bar";
 import { collapsedSidebarWidth, expandedSidebarWidth, navigationGroups } from "@/components/layout/navigation";
+import { getSession, logout as logoutSession, type CompanyMapping } from "@/lib/auth";
 import { applyThemeSettings, getStoredAccentColor, getStoredThemeMode } from "@/lib/theme";
 
 const tokenKey = "propertyConnect.authToken";
@@ -45,24 +46,51 @@ export function Template({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const timerId = window.setTimeout(() => {
-      const storage = getAuthStorage();
+    const timerId = window.setTimeout(async () => {
+      const storage = getAuthStorage() ?? sessionStorage;
 
-      if (!storage) {
+      try {
+        const session = await getSession();
+        if (!session.authenticated) {
+          throw new Error("Please sign in again.");
+        }
+
+        if (session.user) {
+          storage.setItem(userKey, JSON.stringify(session.user));
+        }
+        if (session.companies?.length) {
+          storage.setItem(companiesKey, JSON.stringify(session.companies));
+        }
+        if (session.userProfile) {
+          storage.setItem(userProfileKey, JSON.stringify(session.userProfile));
+        }
+
+        const storedCompany =
+          readStoredObject<WorkspaceCompany>(storage, selectedCompanyKey) ??
+          selectedCompanyFromSession(session.companies ?? [], session.selectedCompanyId);
+
+        if (!storedCompany) {
+          window.location.replace(companySelectionPath);
+          return;
+        }
+
+        storage.setItem(selectedCompanyKey, JSON.stringify(storedCompany));
+        setCompany(storedCompany);
+        setUser(readStoredObject<WorkspaceUser>(storage, userKey));
+        setUserProfile(readStoredObject<StoredUserProfile>(storage, userProfileKey));
+        setIsLoaded(true);
+      } catch {
+        clearSessionStorage(localStorage);
+        clearSessionStorage(sessionStorage);
         window.location.replace(loginPath);
-        return;
       }
-
-      setCompany(readStoredObject<WorkspaceCompany>(storage, selectedCompanyKey));
-      setUser(readStoredObject<WorkspaceUser>(storage, userKey));
-      setUserProfile(readStoredObject<StoredUserProfile>(storage, userProfileKey));
-      setIsLoaded(true);
     }, 0);
 
     return () => window.clearTimeout(timerId);
-  }, [isStandalonePath]);
+  }, [isStandalonePath, pathname]);
 
   function signOut() {
+    logoutSession();
     clearSessionStorage(localStorage);
     clearSessionStorage(sessionStorage);
     window.location.assign(loginPath);
@@ -160,6 +188,14 @@ function clearSessionStorage(storage: Storage) {
   storage.removeItem(userProfileKey);
   storage.removeItem(companySelectionReturnPathKey);
   storage.removeItem(previousCompanyKey);
+}
+
+function selectedCompanyFromSession(companies: CompanyMapping[], selectedCompanyId?: number) {
+  if (!selectedCompanyId) {
+    return null;
+  }
+
+  return companies.find((company) => company.companyId === selectedCompanyId || Number(company.id) === selectedCompanyId) ?? null;
 }
 
 function readStoredObject<T>(storage: Storage, key: string): T | null {

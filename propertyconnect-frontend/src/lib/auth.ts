@@ -37,6 +37,15 @@ export type CompanySelectionResult = {
   userProfile: Record<string, unknown>;
 };
 
+export type SessionResult = {
+  authenticated: boolean;
+  token?: string;
+  user?: LoginResult["user"];
+  companies?: CompanyMapping[];
+  userProfile?: Record<string, unknown>;
+  selectedCompanyId?: number;
+};
+
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_PROPERTYCONNECT_API_URL ?? "http://localhost:8080/propertyConnect/api";
 
@@ -63,6 +72,7 @@ export async function selectCompany(payload: CompanySelectionPayload): Promise<C
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
     },
     credentials: "include",
     body: JSON.stringify({
@@ -85,7 +95,39 @@ export async function selectCompany(payload: CompanySelectionPayload): Promise<C
   return response.json();
 }
 
+export async function getSession(): Promise<SessionResult> {
+  const response = await fetch(`${apiBaseUrl}/auth/session`, {
+    method: "GET",
+    headers: authHeaders(),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.message ?? "Please sign in again.");
+  }
+
+  return response.json();
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${apiBaseUrl}/auth/logout`, {
+    method: "POST",
+    headers: authHeaders(),
+    credentials: "include",
+  }).catch(() => undefined);
+}
+
 function numericId(id: string): number | undefined {
   const value = Number(id);
   return Number.isFinite(value) ? value : undefined;
+}
+
+function authHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const token = localStorage.getItem("propertyConnect.authToken") ?? sessionStorage.getItem("propertyConnect.authToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }

@@ -10,7 +10,8 @@ export type Prospect = {
   prospectNo?: string;
   customerId?: number;
   customerCode?: string;
-  customerType?: string;
+  customerType?: number;
+  customerTypeName?: string;
   customerName: string;
   tradeLicenseNo?: string;
   crNumber?: string;

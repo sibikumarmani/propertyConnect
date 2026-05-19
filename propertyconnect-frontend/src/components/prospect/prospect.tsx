@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Edit3, Loader2, Plus, RefreshCcw, Save, Search, UserCheck } from "lucide-react";
 
 import { WorkspaceDrawer } from "@/components/layout/workspace-drawer";
+import { listCodeValues, type ErpCodeValue } from "@/lib/lead";
 import {
   approveProspectOffer,
   approveProspectReservation,
@@ -224,7 +225,8 @@ const initialNegotiationForm: NegotiationForm = {
 
 type ProspectForm = {
   id?: number;
-  customerType: string;
+  customerType?: number;
+  customerTypeName?: string;
   customerName: string;
   tradeLicenseNo: string;
   crNumber: string;
@@ -245,7 +247,7 @@ type ProspectForm = {
 };
 
 const initialProspectForm: ProspectForm = {
-  customerType: "Commercial",
+  customerType: undefined,
   customerName: "",
   tradeLicenseNo: "",
   crNumber: "",
@@ -274,6 +276,7 @@ const hiddenProspectStatuses = ["ACTIVE"];
 
 export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [customerTypeOptions, setCustomerTypeOptions] = useState<ErpCodeValue[]>([]);
   const [prospectSearch, setProspectSearch] = useState("");
   const [prospectStatusFilter, setProspectStatusFilter] = useState("ALL");
   const [selectedProspectId, setSelectedProspectId] = useState<number | null>(null);
@@ -329,7 +332,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         [
           prospect.prospectNo,
           prospect.customerCode,
-          prospect.customerType,
+          prospect.customerTypeName,
           prospect.customerName,
           prospect.tradeLicenseNo,
           prospect.crNumber,
@@ -395,8 +398,9 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
     setLoading(true);
     setError("");
     try {
-      const loadedProspects = await listProspects();
+      const [loadedProspects, loadedCustomerTypes] = await Promise.all([listProspects(), listCodeValues("cf_firm_type")]);
       setProspects(loadedProspects);
+      setCustomerTypeOptions(loadedCustomerTypes);
       setSelectedProspectId((currentId) => {
         if (currentId && loadedProspects.some((prospect) => prospect.id === currentId)) {
           return currentId;
@@ -725,6 +729,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
       >
         <ProspectFormPanel
           form={prospectForm}
+          customerTypeOptions={customerTypeOptions}
           saving={savingProspect}
           onCancel={() => setProspectDrawerOpen(false)}
           onChange={setProspectForm}
@@ -1298,7 +1303,7 @@ function ProspectDetailPanel({
 
       <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
         <DetailItem label="Customer code" value={prospect.customerCode} />
-        <DetailItem label="Customer type" value={prospect.customerType} />
+        <DetailItem label="Customer type" value={prospect.customerTypeName} />
         <DetailItem label="Trade license no" value={prospect.tradeLicenseNo} />
         <DetailItem label="CR number" value={prospect.crNumber} />
         <DetailItem label="VAT registration no" value={prospect.vatRegistrationNo} />
@@ -1471,12 +1476,14 @@ function ProspectDetailPanel({
 
 function ProspectFormPanel({
   form,
+  customerTypeOptions,
   saving,
   onCancel,
   onChange,
   onSubmit,
 }: {
   form: ProspectForm;
+  customerTypeOptions: ErpCodeValue[];
   saving: boolean;
   onCancel: () => void;
   onChange: (form: ProspectForm) => void;
@@ -1486,7 +1493,15 @@ function ProspectFormPanel({
 
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
-      <Select label="Customer type" value={form.customerType} options={["Commercial", "Residential", "Retail", "Corporate", "Individual", "Government"]} onChange={(value) => onChange({ ...form, customerType: value })} />
+      <CodeValueSelect
+        label="Customer type"
+        value={form.customerType === undefined ? "" : String(form.customerType)}
+        options={customerTypeOptions}
+        onChange={(value) => {
+          const selectedType = customerTypeOptions.find((option) => String(option.id) === value);
+          onChange({ ...form, customerType: numberValue(value), customerTypeName: selectedType?.value });
+        }}
+      />
       <Field label="Customer name" required value={form.customerName} onChange={(value) => onChange({ ...form, customerName: value })} />
       <Field label="Trade license no" value={form.tradeLicenseNo} onChange={(value) => onChange({ ...form, tradeLicenseNo: value })} />
       <Field label="CR number" value={form.crNumber} onChange={(value) => onChange({ ...form, crNumber: value })} />
@@ -1994,10 +2009,27 @@ function OptionSelect({ label, value, options, onChange, required = false }: { l
   );
 }
 
+function CodeValueSelect({ label, value, options, onChange }: { label: string; value: string; options: ErpCodeValue[]; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
+      {label}
+      <select className="field rounded-lg px-3 py-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Select {label.toLowerCase()}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.value}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function prospectToForm(prospect: Prospect): ProspectForm {
   return {
     id: prospect.id,
-    customerType: prospect.customerType ?? "Commercial",
+    customerType: prospect.customerType,
+    customerTypeName: prospect.customerTypeName,
     customerName: prospect.customerName ?? "",
     tradeLicenseNo: prospect.tradeLicenseNo ?? "",
     crNumber: prospect.crNumber ?? "",
@@ -2021,7 +2053,8 @@ function prospectToForm(prospect: Prospect): ProspectForm {
 function formToProspect(form: ProspectForm): Prospect {
   return {
     id: form.id,
-    customerType: emptyToUndefined(form.customerType),
+    customerType: form.customerType,
+    customerTypeName: form.customerTypeName,
     customerName: form.customerName.trim(),
     tradeLicenseNo: emptyToUndefined(form.tradeLicenseNo),
     crNumber: emptyToUndefined(form.crNumber),

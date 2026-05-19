@@ -34,9 +34,6 @@ DELIMITER ;
 CALL pc_rename_audit_column('pa_mst_unit', 'created_at', 'created_on', 'ALTER TABLE pa_mst_unit CHANGE COLUMN created_at created_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
 CALL pc_rename_audit_column('pa_mst_unit', 'updated_at', 'updated_on', 'ALTER TABLE pa_mst_unit CHANGE COLUMN updated_at updated_on DATETIME NULL ON UPDATE CURRENT_TIMESTAMP');
 
-CALL pc_rename_audit_column('pa_mst_customer', 'created_at', 'created_on', 'ALTER TABLE pa_mst_customer CHANGE COLUMN created_at created_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
-CALL pc_rename_audit_column('pa_mst_customer', 'updated_at', 'updated_on', 'ALTER TABLE pa_mst_customer CHANGE COLUMN updated_at updated_on DATETIME NULL ON UPDATE CURRENT_TIMESTAMP');
-
 CALL pc_rename_audit_column('pa_txn_leasing_lead', 'created_at', 'created_on', 'ALTER TABLE pa_txn_leasing_lead CHANGE COLUMN created_at created_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
 CALL pc_rename_audit_column('pa_txn_leasing_lead', 'updated_at', 'updated_on', 'ALTER TABLE pa_txn_leasing_lead CHANGE COLUMN updated_at updated_on DATETIME NULL ON UPDATE CURRENT_TIMESTAMP');
 

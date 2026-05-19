@@ -2,13 +2,11 @@ package com.eba.propertyconnect.propertymanagement.util;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Properties;
 
 public final class ApplicationConfig {
 
-	private static final String LOCAL_PROPERTIES_PATH_PROPERTY = "propertyconnect.local.properties";
+	private static final String SYSTEM_PROPERTIES_FILE = "system.properties";
 	private static final String CORECONNECT_SOAP_ENDPOINT_PROPERTY = "coreconnect.soap.endpoint";
 	private static final String CORECONNECT_SOAP_USERNAME_PROPERTY = "coreconnect.soap.username";
 	private static final String CORECONNECT_SOAP_PASSWORD_PROPERTY = "coreconnect.soap.password";
@@ -20,7 +18,7 @@ public final class ApplicationConfig {
 	private static final String PROPERTYCONNECT_DB_USERNAME_PROPERTY = "propertyconnect.db.username";
 	private static final String PROPERTYCONNECT_DB_PASSWORD_PROPERTY = "propertyconnect.db.password";
 	private static final String PROPERTYCONNECT_DB_MAX_POOL_SIZE_PROPERTY = "propertyconnect.db.maxPoolSize";
-	private static final Properties LOCAL_PROPERTIES = loadLocalProperties();
+	private static final Properties SYSTEM_PROPERTIES = loadSystemProperties();
 
 	private ApplicationConfig() {
 	}
@@ -97,60 +95,24 @@ public final class ApplicationConfig {
 	}
 
 	private static String getConfigValue(String propertyName) {
-		String propertyValue = System.getProperty(propertyName);
-		if (!isBlank(propertyValue)) {
-			return propertyValue.trim();
-		}
-		String localPropertyValue = LOCAL_PROPERTIES.getProperty(propertyName);
-		if (!isBlank(localPropertyValue)) {
-			return localPropertyValue.trim();
-		}
-		String environmentValue = System.getenv(toEnvironmentName(propertyName));
-		if (!isBlank(environmentValue)) {
-			return environmentValue.trim();
+		String systemPropertyValue = SYSTEM_PROPERTIES.getProperty(propertyName);
+		if (!isBlank(systemPropertyValue)) {
+			return systemPropertyValue.trim();
 		}
 		return null;
 	}
 
-	private static Properties loadLocalProperties() {
+	private static Properties loadSystemProperties() {
 		Properties properties = new Properties();
-		Path path = localPropertiesPath();
-		if (path == null || !Files.isRegularFile(path)) {
-			return properties;
-		}
-		try (InputStream inputStream = Files.newInputStream(path)) {
-			properties.load(inputStream);
+		try (InputStream inputStream = ApplicationConfig.class.getClassLoader().getResourceAsStream(SYSTEM_PROPERTIES_FILE)) {
+			if (inputStream != null) {
+				properties.load(inputStream);
+			}
 		}
 		catch (IOException ex) {
-			throw new IllegalStateException("Unable to load PropertyConnect local properties from " + path, ex);
+			throw new IllegalStateException("Unable to load PropertyConnect properties from " + SYSTEM_PROPERTIES_FILE, ex);
 		}
 		return properties;
-	}
-
-	private static Path localPropertiesPath() {
-		String configuredPath = System.getProperty(LOCAL_PROPERTIES_PATH_PROPERTY);
-		if (!isBlank(configuredPath)) {
-			return Path.of(configuredPath.trim()).toAbsolutePath().normalize();
-		}
-
-		Path workingDirectory = Path.of("").toAbsolutePath().normalize();
-		Path currentDirectory = workingDirectory;
-		while (currentDirectory != null) {
-			Path localProperties = currentDirectory.resolve("local.properties");
-			if (Files.isRegularFile(localProperties)) {
-				return localProperties;
-			}
-			Path backendLocalProperties = currentDirectory.resolve("propertyconnect-backend/local.properties");
-			if (Files.isRegularFile(backendLocalProperties)) {
-				return backendLocalProperties;
-			}
-			currentDirectory = currentDirectory.getParent();
-		}
-		return workingDirectory.resolve("local.properties");
-	}
-
-	private static String toEnvironmentName(String propertyName) {
-		return propertyName.toUpperCase().replace('.', '_').replace('-', '_');
 	}
 
 	public static boolean isBlank(String value) {

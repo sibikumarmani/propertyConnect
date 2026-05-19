@@ -8,14 +8,13 @@ BACKEND_DIR="$ROOT_DIR/propertyconnect-backend"
 RUN_DIR="$ROOT_DIR/.run"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
-CORECONNECT_PORT="${CORECONNECT_PORT:-8080}"
+CORECONNECT_PORT="${CORECONNECT_PORT:-8081}"
 BACKEND_SCREEN_SESSION="${BACKEND_SCREEN_SESSION:-propertyconnect-tomee}"
 FRONTEND_SCREEN_SESSION="${FRONTEND_SCREEN_SESSION:-propertyconnect-frontend}"
 
 PROPERTYCONNECT_WAR="$BACKEND_DIR/target/propertyConnect.war"
 CORECONNECT_WAR="$ROOT_DIR/coreConnect/target/coreConnect.war"
 DEPLOY_CORECONNECT="${DEPLOY_CORECONNECT:-false}"
-PROPERTYCONNECT_LOCAL_PROPERTIES="$BACKEND_DIR/local.properties"
 
 mkdir -p "$RUN_DIR"
 
@@ -30,91 +29,15 @@ is_port_listening() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
 }
 
-stop_backend_port_listener() {
-  local attempt clear_checks port_pids pid
-  clear_checks=0
-  for attempt in 1 2 3 4 5; do
-    if ! is_port_listening "$BACKEND_PORT"; then
-      clear_checks=$((clear_checks + 1))
-      if [ "$clear_checks" -ge 3 ]; then
-        return
-      fi
-      sleep 1
-      continue
-    fi
-
-    clear_checks=0
-
-    port_pids="$(lsof -tiTCP:"$BACKEND_PORT" -sTCP:LISTEN || true)"
-    if [ -z "$port_pids" ]; then
-      sleep 1
-      continue
-    fi
-
-    echo "Stopping process(es) still listening on backend port $BACKEND_PORT: $port_pids"
-    kill $port_pids || true
-    sleep 2
-
-    for pid in $port_pids; do
-      if kill -0 "$pid" >/dev/null 2>&1; then
-        echo "Force stopping backend port process $pid"
-        kill -9 "$pid" || true
-      fi
-    done
-    sleep 1
-  done
-
-  if is_port_listening "$BACKEND_PORT"; then
-    echo "Backend port $BACKEND_PORT is still in use after cleanup." >&2
-    lsof -nP -iTCP:"$BACKEND_PORT" -sTCP:LISTEN >&2 || true
-    exit 1
-  fi
-}
-
-stop_tomee_if_running() {
-  if command -v screen >/dev/null 2>&1; then
-    screen -S "$BACKEND_SCREEN_SESSION" -X quit >/dev/null 2>&1 || true
-    rm -f "$RUN_DIR/propertyconnect-tomee.screen"
-  fi
-
-  if is_port_listening "$BACKEND_PORT"; then
-    echo "Stopping existing PropertyConnect TomEE on port $BACKEND_PORT..."
-    (cd "$TOMEE_HOME" && ./bin/shutdown.sh) || true
-    sleep 3
-  fi
-
-  local tomee_pids
-  tomee_pids="$(pgrep -f "catalina.base=$TOMEE_HOME" || true)"
-  if [ -n "$tomee_pids" ]; then
-    echo "Stopping leftover PropertyConnect TomEE process(es): $tomee_pids"
-    kill $tomee_pids || true
-    sleep 2
-  fi
-
-  tomee_pids="$(pgrep -f "catalina.base=$TOMEE_HOME" || true)"
-  if [ -n "$tomee_pids" ]; then
-    echo "Force stopping leftover PropertyConnect TomEE process(es): $tomee_pids"
-    kill -9 $tomee_pids || true
-  fi
-
-  stop_backend_port_listener
-}
-
 echo "Using TomEE: $TOMEE_HOME"
 require_file "$TOMEE_HOME/bin/startup.sh"
-require_file "$TOMEE_HOME/bin/shutdown.sh"
-require_file "$PROPERTYCONNECT_LOCAL_PROPERTIES"
 
 echo "Building PropertyConnect backend WAR..."
-(cd "$BACKEND_DIR" && mvn package)
+(cd "$BACKEND_DIR" && mvn clean package)
 require_file "$PROPERTYCONNECT_WAR"
 
-stop_tomee_if_running
-
 echo "Deploying PropertyConnect backend as propertyConnect.war..."
-rm -rf "$TOMEE_HOME/webapps/propertyconnect-backend" \
-       "$TOMEE_HOME/webapps/propertyconnect-backend.war" \
-       "$TOMEE_HOME/webapps/propertyConnect" \
+rm -rf "$TOMEE_HOME/webapps/propertyConnect" \
        "$TOMEE_HOME/webapps/propertyConnect.war"
 cp "$PROPERTYCONNECT_WAR" "$TOMEE_HOME/webapps/propertyConnect.war"
 
@@ -127,17 +50,20 @@ else
   echo "Leaving existing CoreConnect deployment as-is. Set DEPLOY_CORECONNECT=true to redeploy it."
 fi
 
-echo "Starting TomEE on port $BACKEND_PORT..."
-if command -v screen >/dev/null 2>&1; then
-  screen -dmS "$BACKEND_SCREEN_SESSION" bash -lc "cd '$TOMEE_HOME' && export CATALINA_OPTS=\"\${CATALINA_OPTS:-} -Dpropertyconnect.local.properties=$PROPERTYCONNECT_LOCAL_PROPERTIES\" && ./bin/catalina.sh run"
-  echo "$BACKEND_SCREEN_SESSION" > "$RUN_DIR/propertyconnect-tomee.screen"
+if is_port_listening "$BACKEND_PORT"; then
+  echo "Backend port $BACKEND_PORT is already listening; skipping TomEE startup."
 else
-  (
-    cd "$TOMEE_HOME"
-    export CATALINA_OPTS="${CATALINA_OPTS:-} -Dpropertyconnect.local.properties=$PROPERTYCONNECT_LOCAL_PROPERTIES"
-    export USE_NOHUP=true
-    ./bin/startup.sh
-  )
+  echo "Starting TomEE on port $BACKEND_PORT..."
+  if command -v screen >/dev/null 2>&1; then
+    screen -dmS "$BACKEND_SCREEN_SESSION" bash -lc "cd '$TOMEE_HOME' && ./bin/catalina.sh run"
+    echo "$BACKEND_SCREEN_SESSION" > "$RUN_DIR/propertyconnect-tomee.screen"
+  else
+    (
+      cd "$TOMEE_HOME"
+      export USE_NOHUP=true
+      ./bin/startup.sh
+    )
+  fi
 fi
 
 if is_port_listening "$FRONTEND_PORT"; then

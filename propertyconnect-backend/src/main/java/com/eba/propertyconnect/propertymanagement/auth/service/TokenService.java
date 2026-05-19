@@ -33,6 +33,14 @@ public class TokenService {
 		return payload == null ? null : payload.userId();
 	}
 
+	public AuthenticatedUser authenticatedUser(String authorizationHeader) {
+		TokenPayload payload = tokenPayload(authorizationHeader);
+		if (payload == null) {
+			return null;
+		}
+		return new AuthenticatedUser(payload.userId(), payload.name(), payload.email());
+	}
+
 	private TokenPayload tokenPayload(String authorizationHeader) {
 		if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
 			return null;
