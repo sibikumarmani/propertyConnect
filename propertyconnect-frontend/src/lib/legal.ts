@@ -36,7 +36,7 @@ export type LegalCardTimeline = {
   statusId: number;
   status?: string;
   step: string;
-  action: "Created" | "Updated" | "Workflow";
+  action: "Created" | "Updated" | "Status Changed" | "Workflow";
   remarks?: string;
   actor?: string;
   timestamp?: string;

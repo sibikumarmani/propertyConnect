@@ -73,9 +73,9 @@ public class LegalService {
 		validate(request, true);
 		LegalCard card = request;
 		card.legalCardNo = defaultString(card.legalCardNo, nextLegalCardNo());
-		card.currentStageId = defaultId(card.currentStageId, LegalReferenceData.STATUS_INITIATED);
-		card.documentStatusId = defaultId(card.documentStatusId, LegalReferenceData.STATUS_INITIATED);
-		card.approvalStatusId = defaultId(card.approvalStatusId, LegalReferenceData.APPROVAL_APPROVED);
+		card.currentStageId = LegalReferenceData.STATUS_INITIATED;
+		card.documentStatusId = LegalReferenceData.STATUS_INITIATED;
+		card.approvalStatusId = LegalReferenceData.APPROVAL_APPROVED;
 		card.priority = defaultString(card.priority, "M");
 		card.comments = requiredComments(card.comments);
 		if (mapper.countByLegalCardNo(card.legalCardNo, null) > 0) {
@@ -100,6 +100,9 @@ public class LegalService {
 		LegalCard card = request;
 		card.id = id;
 		card.legalCardNo = existing.legalCardNo;
+		card.currentStageId = existing.currentStageId;
+		card.documentStatusId = existing.documentStatusId;
+		card.approvalStatusId = existing.approvalStatusId;
 		card.comments = requiredComments(card.comments);
 		if (mapper.countByLegalCardNo(card.legalCardNo, id) > 0) {
 			throw new IllegalArgumentException("Legal Card No must be unique");
@@ -128,7 +131,7 @@ public class LegalService {
 		}
 		String comments = requiredComments(request.comments);
 		mapper.updateLegalCardStatus(id, request.statusId, request.updatedBy);
-		insertTimeline(id, request.statusId, "Workflow", comments, request.updatedBy);
+		insertTimeline(id, request.statusId, "Status Changed", comments, request.updatedBy);
 		return getLegalCard(id);
 	}
 
