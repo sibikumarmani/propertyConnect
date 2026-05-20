@@ -13,9 +13,9 @@ public class Lead extends AuditModel {
 	public String contactPerson;
 	public String mobileNo;
 	public String email;
-	public String preferredContactMethod;
-	public String purpose;
-	public String status;
+	public Integer preferredContactMethod;
+	public Integer purpose;
+	public Integer status;
 	public Integer qualificationScore;
 	public String qualificationNotes;
 }

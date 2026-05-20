@@ -5,6 +5,7 @@ import { Edit3, Loader2, Plus, RefreshCcw, Save, Search, UserCheck } from "lucid
 
 import { WorkspaceDrawer } from "@/components/layout/workspace-drawer";
 import { listCodeValues, type ErpCodeValue } from "@/lib/lead";
+import { listBlocks, listFloors, listProperties, listUnits, type MasterRecord, type PropertyMaster } from "@/lib/property-management";
 import {
   approveProspectOffer,
   approveProspectReservation,
@@ -57,6 +58,14 @@ type ProspectBoardProps = {
   prospectStatuses: string[];
   requirements: ProspectRequirement[];
   offers: ProspectOffer[];
+  preferredContactOptions: ErpCodeValue[];
+  leadSourceOptions: ErpCodeValue[];
+  leadPurposeOptions: ErpCodeValue[];
+  offerStatusOptions: ErpCodeValue[];
+  prospectStatusOptions: ErpCodeValue[];
+  requirementLevelOptions: ErpCodeValue[];
+  siteVisitStatusOptions: ErpCodeValue[];
+  unitTypeOptions: ErpCodeValue[];
   selectedProspect: Prospect | null;
   siteVisits: ProspectSiteVisit[];
   onProspectSearchChange: (value: string) => void;
@@ -99,11 +108,11 @@ type RequirementForm = {
 const initialRequirementForm: RequirementForm = {
   propertyId: "",
   propertyName: "",
-  requirementLevel: "PROPERTY",
+  requirementLevel: "",
   blockName: "",
   floorName: "",
   preferredUnitId: "",
-  unitType: "Office",
+  unitType: "",
   bedrooms: "",
   areaFrom: "",
   areaTo: "",
@@ -123,7 +132,9 @@ type SiteVisitForm = {
   propertyId: string;
   propertyName: string;
   requirementLevel: string;
+  blockId: string;
   blockName: string;
+  floorId: string;
   floorName: string;
   unitId: string;
   visitAt: string;
@@ -139,12 +150,14 @@ type SelectOption = {
 const initialSiteVisitForm: SiteVisitForm = {
   propertyId: "",
   propertyName: "",
-  requirementLevel: "PROPERTY",
+  requirementLevel: "",
+  blockId: "",
   blockName: "",
+  floorId: "",
   floorName: "",
   unitId: "",
   visitAt: "",
-  status: "SCHEDULED",
+  status: "",
   notes: "",
 };
 
@@ -153,7 +166,9 @@ type OfferForm = {
   propertyId: string;
   propertyName: string;
   requirementLevel: string;
+  blockId: string;
   blockName: string;
+  floorId: string;
   floorName: string;
   unitId: string;
   baseAmount: string;
@@ -166,15 +181,17 @@ type OfferForm = {
 const initialOfferForm: OfferForm = {
   propertyId: "",
   propertyName: "",
-  requirementLevel: "PROPERTY",
+  requirementLevel: "",
+  blockId: "",
   blockName: "",
+  floorId: "",
   floorName: "",
   unitId: "",
   baseAmount: "",
   discountAmount: "",
   finalAmount: "",
   specialTerms: "",
-  status: "DRAFT",
+  status: "",
 };
 
 type NegotiationForm = {
@@ -202,7 +219,7 @@ const initialReservationForm: ReservationForm = {
   reservationFee: "",
   paymentWaived: false,
   expiresAt: "",
-  status: "DRAFT",
+  status: "",
 };
 
 type PaymentForm = {
@@ -237,7 +254,7 @@ type ProspectForm = {
   mobileNo: string;
   phoneNo: string;
   email: string;
-  preferredContactMethod: string;
+  preferredContactMethod?: number;
   faxNo: string;
   address: string;
   source: string;
@@ -258,11 +275,10 @@ const initialProspectForm: ProspectForm = {
   mobileNo: "",
   phoneNo: "",
   email: "",
-  preferredContactMethod: "WhatsApp",
   faxNo: "",
   address: "",
   source: "",
-  purpose: "RENT",
+  purpose: "",
   commercialNeed: "",
   documentNotes: "",
 };
@@ -272,11 +288,18 @@ const prospectScreenMeta: Record<ProspectScreen, { title: string; subtitle: stri
 };
 
 const prospectStageStatuses = ["PROSPECT", "REQUIREMENT_CAPTURED", "SITE_VISIT_SCHEDULED", "OFFER_IN_PROGRESS", "NEGOTIATION_IN_PROGRESS", "RESERVATION_IN_PROGRESS"];
-const hiddenProspectStatuses = ["ACTIVE"];
 
 export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [customerTypeOptions, setCustomerTypeOptions] = useState<ErpCodeValue[]>([]);
+  const [preferredContactOptions, setPreferredContactOptions] = useState<ErpCodeValue[]>([]);
+  const [leadSourceOptions, setLeadSourceOptions] = useState<ErpCodeValue[]>([]);
+  const [leadPurposeOptions, setLeadPurposeOptions] = useState<ErpCodeValue[]>([]);
+  const [offerStatusOptions, setOfferStatusOptions] = useState<ErpCodeValue[]>([]);
+  const [prospectStatusOptions, setProspectStatusOptions] = useState<ErpCodeValue[]>([]);
+  const [requirementLevelOptions, setRequirementLevelOptions] = useState<ErpCodeValue[]>([]);
+  const [siteVisitStatusOptions, setSiteVisitStatusOptions] = useState<ErpCodeValue[]>([]);
+  const [unitTypeOptions, setUnitTypeOptions] = useState<ErpCodeValue[]>([]);
   const [prospectSearch, setProspectSearch] = useState("");
   const [prospectStatusFilter, setProspectStatusFilter] = useState("ALL");
   const [selectedProspectId, setSelectedProspectId] = useState<number | null>(null);
@@ -307,26 +330,24 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
     () => prospects.find((prospect) => (selectedProspectId ? prospect.id === selectedProspectId : prospect.id)) ?? null,
     [prospects, selectedProspectId],
   );
-  const prospectStatuses = useMemo(
-    () => [
-      "ALL",
-      ...prospectStageStatuses,
-      ...Array.from(
-        new Set(
-          prospects.flatMap((prospect) => {
-            const normalizedStatus = normalizeStatus(prospect.status);
-            return normalizedStatus && !prospectStageStatuses.includes(normalizedStatus) && !hiddenProspectStatuses.includes(normalizedStatus) ? [normalizedStatus] : [];
-          }),
-        ),
-      ),
-    ],
-    [prospects],
-  );
+  const prospectStatuses = useMemo(() => {
+    const options = prospectStatusOptions.flatMap((status) => {
+      const key = codeValueKeyFromText(status.value);
+      return status.id && key && prospectStageStatuses.includes(key) ? [String(status.id)] : [];
+    });
+    for (const prospect of prospects) {
+      const key = codeValueKey(prospectStatusOptions, prospect.status);
+      if (prospect.status && key && prospectStageStatuses.includes(key) && !options.includes(String(prospect.status))) {
+        options.push(String(prospect.status));
+      }
+    }
+    return ["ALL", ...options];
+  }, [prospectStatusOptions, prospects]);
   const filteredProspects = useMemo(() => {
     const query = prospectSearch.trim().toLowerCase();
 
     return prospects.filter((prospect) => {
-      const matchesStatus = prospectStatusFilter === "ALL" || normalizeStatus(prospect.status) === normalizeStatus(prospectStatusFilter);
+      const matchesStatus = prospectStatusFilter === "ALL" || String(prospect.status ?? "") === prospectStatusFilter;
       const matchesQuery =
         !query ||
         [
@@ -341,15 +362,15 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
           prospect.mobileNo,
           prospect.phoneNo,
           prospect.email,
-          prospect.source,
-          prospect.purpose,
+          codeValueLabel(leadSourceOptions, prospect.source),
+          codeValueLabel(leadPurposeOptions, prospect.purpose),
           prospect.commercialNeed,
-          prospect.status,
+          codeValueLabel(prospectStatusOptions, prospect.status),
         ].some((value) => String(value ?? "").toLowerCase().includes(query));
 
       return matchesStatus && matchesQuery;
     });
-  }, [prospectSearch, prospectStatusFilter, prospects]);
+  }, [leadPurposeOptions, leadSourceOptions, prospectSearch, prospectStatusFilter, prospectStatusOptions, prospects]);
   const prospectStageCards = useMemo<ProspectStageCard[]>(
     () => {
       const currentMonthProspects = prospects.filter((prospect) => isCurrentMonth(prospect.createdOn)).length;
@@ -365,31 +386,31 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         },
         {
           label: "Total Active Prospects",
-          value: prospects.filter((prospect) => matchesStatus(prospect.status, [...prospectStageStatuses, "PROSPECT", "REQUIREMENT", "SITE_VISIT", "OFFER", "NEGOTIATION", "RESERVED", "LEASE_PROCESS"])).length,
+          value: prospects.filter((prospect) => prospectStageStatuses.includes(codeValueKey(prospectStatusOptions, prospect.status) ?? "")).length,
           caption: "Need follow-up",
           captionTone: "warning",
         },
         {
           label: "Prospect",
-          value: prospects.filter((prospect) => matchesStatus(prospect.status, ["PROSPECT", "INQUIRY", "NEW", "QUALIFIED"])).length,
+          value: prospects.filter((prospect) => codeValueKey(prospectStatusOptions, prospect.status) === "PROSPECT").length,
           caption: "New prospects",
           captionTone: "success",
         },
         {
           label: "Visit",
-          value: prospects.filter((prospect) => matchesStatus(prospect.status, ["SITE_VISIT_SCHEDULED", "SITE_VISIT", "VISIT", "SITE_VISIT_COMPLETED"])).length,
+          value: prospects.filter((prospect) => codeValueKey(prospectStatusOptions, prospect.status) === "SITE_VISIT_SCHEDULED").length,
           caption: "Scheduled / completed",
           captionTone: "warning",
         },
         {
           label: "Negotiation",
-          value: prospects.filter((prospect) => matchesStatus(prospect.status, ["NEGOTIATION_IN_PROGRESS", "NEGOTIATION", "OFFER", "OFFERED", "OFFER_IN_PROGRESS"])).length,
+          value: prospects.filter((prospect) => ["OFFER_IN_PROGRESS", "NEGOTIATION_IN_PROGRESS"].includes(codeValueKey(prospectStatusOptions, prospect.status) ?? "")).length,
           caption: "Offer in progress",
           captionTone: "warning",
         },
       ];
     },
-    [prospects],
+    [prospectStatusOptions, prospects],
   );
   const meta = prospectScreenMeta[screen];
   const Icon = meta.icon;
@@ -398,9 +419,17 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
     setLoading(true);
     setError("");
     try {
-      const [loadedProspects, loadedCustomerTypes] = await Promise.all([listProspects(), listCodeValues("cf_firm_type")]);
+      const [loadedProspects, loadedCustomerTypes, loadedContactMethods, loadedLeadSources, loadedLeadPurposes, loadedProspectStatuses, loadedOfferStatuses, loadedRequirementLevels, loadedUnitTypes, loadedSiteVisitStatuses] = await Promise.all([listProspects(), listCodeValues("cf_firm_type"), listCodeValues("oc_communicate_through"), listCodeValues("oc_lead_source"), listCodeValues("oc_lead_purpose"), listCodeValues("oc_prospect_status"), listCodeValues("pa_offer_status"), listCodeValues("pa_requirement_level"), listCodeValues("pa_unit_type"), listCodeValues("pa_site_visit_status")]);
       setProspects(loadedProspects);
       setCustomerTypeOptions(loadedCustomerTypes);
+      setPreferredContactOptions(loadedContactMethods);
+      setLeadSourceOptions(loadedLeadSources);
+      setLeadPurposeOptions(loadedLeadPurposes);
+      setProspectStatusOptions(loadedProspectStatuses);
+      setOfferStatusOptions(loadedOfferStatuses);
+      setRequirementLevelOptions(loadedRequirementLevels);
+      setUnitTypeOptions(loadedUnitTypes);
+      setSiteVisitStatusOptions(loadedSiteVisitStatuses);
       setSelectedProspectId((currentId) => {
         if (currentId && loadedProspects.some((prospect) => prospect.id === currentId)) {
           return currentId;
@@ -547,7 +576,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
     setMessage("");
     try {
       const action = event.nativeEvent instanceof SubmitEvent && event.nativeEvent.submitter instanceof HTMLButtonElement ? event.nativeEvent.submitter.value : "draft";
-      const status = action === "submit" ? "PENDING_APPROVAL" : "DRAFT";
+      const status = codeValueIdByKey(offerStatusOptions, action === "submit" ? "PENDING_APPROVAL" : "DRAFT");
       const payload = { ...formToOffer(offerForm, selectedProspect.id), status };
       if (offerForm.id) {
         await updateProspectOffer(offerForm.id, payload);
@@ -650,7 +679,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         await approveProspectOffer(offer.id, { approved: true, comments: "Approved." });
         setMessage("Offer approved.");
       } else if (action === "reject") {
-        if (offer.status === "PENDING_APPROVAL") {
+        if (codeValueKey(offerStatusOptions, offer.status) === "PENDING_APPROVAL") {
           await approveProspectOffer(offer.id, { approved: false, comments: "Rejected." });
         } else {
           await updateProspectOfferStatus(offer.id, { status: "REJECTED", comments: "Offer rejected." });
@@ -705,6 +734,14 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         prospectStatuses={prospectStatuses}
         requirements={requirements}
         offers={offers}
+        preferredContactOptions={preferredContactOptions}
+        leadSourceOptions={leadSourceOptions}
+        leadPurposeOptions={leadPurposeOptions}
+        offerStatusOptions={offerStatusOptions}
+        prospectStatusOptions={prospectStatusOptions}
+        requirementLevelOptions={requirementLevelOptions}
+        siteVisitStatusOptions={siteVisitStatusOptions}
+        unitTypeOptions={unitTypeOptions}
         selectedProspect={selectedProspect}
         siteVisits={siteVisits}
         onProspectSearchChange={setProspectSearch}
@@ -730,6 +767,9 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         <ProspectFormPanel
           form={prospectForm}
           customerTypeOptions={customerTypeOptions}
+          preferredContactOptions={preferredContactOptions}
+          leadSourceOptions={leadSourceOptions}
+          leadPurposeOptions={leadPurposeOptions}
           saving={savingProspect}
           onCancel={() => setProspectDrawerOpen(false)}
           onChange={setProspectForm}
@@ -745,7 +785,9 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
       >
         <RequirementFormPanel
           form={requirementForm}
+          requirementLevelOptions={requirementLevelOptions}
           saving={savingRequirement}
+          unitTypeOptions={unitTypeOptions}
           onCancel={() => setRequirementDrawerOpen(false)}
           onChange={setRequirementForm}
           onSubmit={submitRequirement}
@@ -775,8 +817,9 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
       >
         <SiteVisitFormPanel
           form={siteVisitForm}
-          requirements={requirements}
+          requirementLevelOptions={requirementLevelOptions}
           saving={savingSiteVisit}
+          siteVisitStatusOptions={siteVisitStatusOptions}
           onCancel={() => setSiteVisitDrawerOpen(false)}
           onChange={setSiteVisitForm}
           onSubmit={submitSiteVisit}
@@ -791,7 +834,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
       >
         <OfferFormPanel
           form={offerForm}
-          requirements={requirements}
+          requirementLevelOptions={requirementLevelOptions}
           saving={savingOffer}
           onCancel={() => setOfferDrawerOpen(false)}
           onChange={setOfferForm}
@@ -805,7 +848,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         title="View offer"
         onClose={() => setOfferView(null)}
       >
-        {offerView ? <OfferViewPanel offer={offerView} /> : null}
+        {offerView ? <OfferViewPanel offer={offerView} offerStatusOptions={offerStatusOptions} /> : null}
       </WorkspaceDrawer>
     </section>
   );
@@ -814,6 +857,9 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
 export function ReservationWorkspace() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [offers, setOffers] = useState<ProspectOffer[]>([]);
+  const [offerStatusOptions, setOfferStatusOptions] = useState<ErpCodeValue[]>([]);
+  const [reservationStatusOptions, setReservationStatusOptions] = useState<ErpCodeValue[]>([]);
+  const [decisionOptions, setDecisionOptions] = useState<ErpCodeValue[]>([]);
   const [reservations, setReservations] = useState<ProspectReservation[]>([]);
   const [reservationForm, setReservationForm] = useState<ReservationForm>(initialReservationForm);
   const [reservationView, setReservationView] = useState<ProspectReservation | null>(null);
@@ -829,22 +875,30 @@ export function ReservationWorkspace() {
   const [message, setMessage] = useState("");
 
   const prospectById = useMemo(() => new Map(prospects.flatMap((prospect) => (prospect.id === undefined ? [] : [[prospect.id, prospect]]))), [prospects]);
-  const reservableOffers = useMemo(() => offers.filter((offer) => offer.status === "ACCEPTED"), [offers]);
-  const reservationStatuses = useMemo(
-    () => ["ALL", ...Array.from(new Set(reservations.flatMap((reservation) => (reservation.status ? [reservation.status] : []))))],
-    [reservations],
-  );
+  const reservableOffers = useMemo(() => offers.filter((offer) => codeValueKey(offerStatusOptions, offer.status) === "ACCEPTED"), [offerStatusOptions, offers]);
+  const reservationStatuses = useMemo(() => {
+    const options = reservationStatusOptions.flatMap((status) => {
+      const key = codeValueKeyFromText(status.value);
+      return status.id && key ? [String(status.id)] : [];
+    });
+    for (const reservation of reservations) {
+      if (reservation.status && !options.includes(String(reservation.status))) {
+        options.push(String(reservation.status));
+      }
+    }
+    return ["ALL", ...options];
+  }, [reservationStatusOptions, reservations]);
   const filteredReservations = useMemo(() => {
     const query = reservationSearch.trim().toLowerCase();
     return reservations.filter((reservation) => {
       const prospect = reservation.prospectId === undefined ? undefined : prospectById.get(reservation.prospectId);
-      const matchesStatus = reservationStatusFilter === "ALL" || reservation.status === reservationStatusFilter;
+      const matchesStatus = reservationStatusFilter === "ALL" || String(reservation.status ?? "") === reservationStatusFilter;
       const matchesQuery =
         !query ||
         [
           reservation.reservationNo,
-          reservation.status,
-          reservation.approvalStatus,
+          codeValueLabel(reservationStatusOptions, reservation.status),
+          codeValueLabel(decisionOptions, reservation.approvalStatus),
           reservation.offerId,
           reservation.unitId,
           prospect?.prospectNo,
@@ -853,25 +907,28 @@ export function ReservationWorkspace() {
         ].some((value) => String(value ?? "").toLowerCase().includes(query));
       return matchesStatus && matchesQuery;
     });
-  }, [prospectById, reservationSearch, reservationStatusFilter, reservations]);
+  }, [decisionOptions, prospectById, reservationSearch, reservationStatusFilter, reservationStatusOptions, reservations]);
   const reservationCards = useMemo(
     () => [
-      { label: "Active Reservations", value: reservations.filter((reservation) => ["DRAFT", "PENDING_APPROVAL", "PAYMENT_PENDING", "PAID"].includes(reservation.status ?? "")).length, caption: "Need follow-up", captionTone: "warning" as const },
-      { label: "Pending Approval", value: reservations.filter((reservation) => reservation.status === "PENDING_APPROVAL").length, caption: "Approval queue", captionTone: "warning" as const },
-      { label: "Payment Pending", value: reservations.filter((reservation) => reservation.status === "PAYMENT_PENDING").length, caption: "Awaiting receipt", captionTone: "warning" as const },
-      { label: "Confirmed", value: reservations.filter((reservation) => reservation.status === "CONFIRMED").length, caption: "Ready for lease", captionTone: "success" as const },
+      { label: "Active Reservations", value: reservations.filter((reservation) => ["DRAFT", "PENDING_APPROVAL", "PAYMENT_PENDING", "PAID"].includes(codeValueKey(reservationStatusOptions, reservation.status) ?? "")).length, caption: "Need follow-up", captionTone: "warning" as const },
+      { label: "Pending Approval", value: reservations.filter((reservation) => codeValueKey(reservationStatusOptions, reservation.status) === "PENDING_APPROVAL").length, caption: "Approval queue", captionTone: "warning" as const },
+      { label: "Payment Pending", value: reservations.filter((reservation) => codeValueKey(reservationStatusOptions, reservation.status) === "PAYMENT_PENDING").length, caption: "Awaiting receipt", captionTone: "warning" as const },
+      { label: "Confirmed", value: reservations.filter((reservation) => codeValueKey(reservationStatusOptions, reservation.status) === "CONFIRMED").length, caption: "Ready for lease", captionTone: "success" as const },
     ],
-    [reservations],
+    [reservationStatusOptions, reservations],
   );
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [loadedProspects, loadedOffers, loadedReservations] = await Promise.all([listProspects(), listOffers(), listReservations()]);
+      const [loadedProspects, loadedOffers, loadedReservations, loadedOfferStatuses, loadedReservationStatuses, loadedDecisions] = await Promise.all([listProspects(), listOffers(), listReservations(), listCodeValues("pa_offer_status"), listCodeValues("pa_reservation_status"), listCodeValues("cf_decision")]);
       setProspects(loadedProspects);
       setOffers(loadedOffers);
       setReservations(loadedReservations);
+      setOfferStatusOptions(loadedOfferStatuses);
+      setReservationStatusOptions(loadedReservationStatuses);
+      setDecisionOptions(loadedDecisions);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load reservations.");
     } finally {
@@ -889,14 +946,14 @@ export function ReservationWorkspace() {
   function openNewReservation() {
     setReservationForm({
       ...initialReservationForm,
-      status: "DRAFT",
+      status: String(codeValueIdByKey(reservationStatusOptions, "DRAFT") ?? ""),
       reservationFee: "5000",
     });
     setReservationDrawerOpen(true);
   }
 
   function openEditReservation(reservation: ProspectReservation) {
-    if (reservation.status !== "DRAFT") {
+    if (codeValueKey(reservationStatusOptions, reservation.status) !== "DRAFT") {
       return;
     }
     setReservationForm(reservationToForm(reservation));
@@ -921,14 +978,14 @@ export function ReservationWorkspace() {
     setMessage("");
     try {
       const action = event.nativeEvent instanceof SubmitEvent && event.nativeEvent.submitter instanceof HTMLButtonElement ? event.nativeEvent.submitter.value : "draft";
-      const status = action === "submit" ? "PENDING_APPROVAL" : "DRAFT";
+      const status = codeValueIdByKey(reservationStatusOptions, action === "submit" ? "PENDING_APPROVAL" : "DRAFT");
       const payload = { ...formToReservation(reservationForm, prospectId), status };
       if (reservationForm.id) {
         await updateProspectReservation(reservationForm.id, payload);
-        setMessage(action === "submit" ? "Reservation submitted for approval." : "Reservation draft updated.");
+        setMessage(action === "submit" ? "Reservation submitted." : "Reservation draft updated.");
       } else {
         await saveProspectReservation(payload);
-        setMessage(action === "submit" ? "Reservation submitted for approval." : "Reservation draft saved.");
+        setMessage(action === "submit" ? "Reservation submitted." : "Reservation draft saved.");
       }
       await refresh();
       setReservationDrawerOpen(false);
@@ -979,8 +1036,8 @@ export function ReservationWorkspace() {
     setMessage("");
     try {
       if (action === "submit") {
-        await updateProspectReservationStatus(reservation.id, { status: "PENDING_APPROVAL", comments: "Reservation submitted for approval." });
-        setMessage("Reservation submitted for approval.");
+        await updateProspectReservationStatus(reservation.id, { status: "PENDING_APPROVAL", comments: "Reservation submitted." });
+        setMessage("Reservation submitted.");
       } else if (action === "approve") {
         await approveProspectReservation(reservation.id, { approved: true, comments: "Approved." });
         setMessage("Reservation approved.");
@@ -1059,7 +1116,7 @@ export function ReservationWorkspace() {
               <select className="field rounded-lg px-3 py-3 text-sm" onChange={(event) => setReservationStatusFilter(event.target.value)} value={reservationStatusFilter}>
                 {reservationStatuses.map((status) => (
                   <option key={status} value={status}>
-                    {status === "ALL" ? "All status" : formatLabel(status)}
+                    {status === "ALL" ? "All status" : codeValueLabel(reservationStatusOptions, numberValue(status)) ?? formatLabel(status)}
                   </option>
                 ))}
               </select>
@@ -1081,6 +1138,8 @@ export function ReservationWorkspace() {
                   key={reservation.id ?? reservation.reservationNo}
                   prospect={prospect}
                   reservation={reservation}
+                  decisionOptions={decisionOptions}
+                  reservationStatusOptions={reservationStatusOptions}
                   saving={savingReservation}
                   onAction={runReservationAction}
                   onEdit={openEditReservation}
@@ -1104,7 +1163,7 @@ export function ReservationWorkspace() {
       </WorkspaceDrawer>
 
       <WorkspaceDrawer eyebrow="Reservation" open={Boolean(reservationView)} title="View reservation" onClose={() => setReservationView(null)}>
-        {reservationView ? <ReservationViewPanel reservation={reservationView} prospect={reservationView.prospectId === undefined ? undefined : prospectById.get(reservationView.prospectId)} /> : null}
+        {reservationView ? <ReservationViewPanel decisionOptions={decisionOptions} reservation={reservationView} reservationStatusOptions={reservationStatusOptions} prospect={reservationView.prospectId === undefined ? undefined : prospectById.get(reservationView.prospectId)} /> : null}
       </WorkspaceDrawer>
 
       <WorkspaceDrawer eyebrow="Payment" open={paymentDrawerOpen} title="Record reservation payment" onClose={() => setPaymentDrawerOpen(false)}>
@@ -1129,6 +1188,14 @@ function ProspectBoard({
   prospectStatuses,
   requirements,
   offers,
+  preferredContactOptions,
+  leadSourceOptions,
+  leadPurposeOptions,
+  offerStatusOptions,
+  prospectStatusOptions,
+  requirementLevelOptions,
+  siteVisitStatusOptions,
+  unitTypeOptions,
   selectedProspect,
   siteVisits,
   onProspectSearchChange,
@@ -1175,7 +1242,7 @@ function ProspectBoard({
               <select className="field rounded-lg px-3 py-3 text-sm" onChange={(event) => onProspectStatusFilterChange(event.target.value)} value={prospectStatusFilter}>
                 {prospectStatuses.map((status) => (
                   <option key={status} value={status}>
-                    {status === "ALL" ? "All status" : formatLabel(status)}
+                    {status === "ALL" ? "All status" : codeValueLabel(prospectStatusOptions, numberValue(status)) ?? formatLabel(status)}
                   </option>
                 ))}
               </select>
@@ -1209,15 +1276,16 @@ function ProspectBoard({
                       <p className="truncate text-sm font-semibold text-[color:var(--brand-strong)]">{prospect.customerName || "Unnamed prospect"}</p>
                       <p className="mt-1 truncate text-xs font-medium text-[color:var(--foreground-muted)]">{prospect.prospectNo ?? "Prospect number pending"}</p>
                     </div>
-                    <StatusPill status={prospect.status} />
+                    <StatusPill status={codeValueKey(prospectStatusOptions, prospect.status)} label={codeValueLabel(prospectStatusOptions, prospect.status)} />
                   </div>
                   <div className="mt-3 grid gap-1 text-xs text-[color:var(--foreground-muted)]">
                     <p className="truncate">{prospect.mobileNo || "-"}</p>
                     <p className="truncate">{prospect.email || "Email not captured"}</p>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <SmallPill label={prospect.purpose ?? "Purpose pending"} />
-                    <SmallPill label={prospect.preferredContactMethod ?? "Contact pending"} />
+                    <SmallPill label={codeValueLabel(leadSourceOptions, prospect.source) ?? "Source pending"} />
+                    <SmallPill label={codeValueLabel(leadPurposeOptions, prospect.purpose) ?? "Purpose pending"} />
+                    <SmallPill label={codeValueLabel(preferredContactOptions, prospect.preferredContactMethod) ?? "Contact pending"} />
                   </div>
                 </button>
               );
@@ -1230,6 +1298,13 @@ function ProspectBoard({
           requirements={requirements}
           offers={offers}
           siteVisits={siteVisits}
+          leadSourceOptions={leadSourceOptions}
+          leadPurposeOptions={leadPurposeOptions}
+          offerStatusOptions={offerStatusOptions}
+          prospectStatusOptions={prospectStatusOptions}
+          requirementLevelOptions={requirementLevelOptions}
+          siteVisitStatusOptions={siteVisitStatusOptions}
+          unitTypeOptions={unitTypeOptions}
           onCreateRequirement={onCreateRequirement}
           onCreateOffer={onCreateOffer}
           onCreateSiteVisit={onCreateSiteVisit}
@@ -1250,6 +1325,13 @@ function ProspectDetailPanel({
   requirements,
   offers,
   siteVisits,
+  leadPurposeOptions,
+  leadSourceOptions,
+  offerStatusOptions,
+  prospectStatusOptions,
+  requirementLevelOptions,
+  siteVisitStatusOptions,
+  unitTypeOptions,
   onCreateRequirement,
   onCreateOffer,
   onCreateSiteVisit,
@@ -1264,6 +1346,13 @@ function ProspectDetailPanel({
   requirements: ProspectRequirement[];
   offers: ProspectOffer[];
   siteVisits: ProspectSiteVisit[];
+  leadPurposeOptions: ErpCodeValue[];
+  leadSourceOptions: ErpCodeValue[];
+  offerStatusOptions: ErpCodeValue[];
+  prospectStatusOptions: ErpCodeValue[];
+  requirementLevelOptions: ErpCodeValue[];
+  siteVisitStatusOptions: ErpCodeValue[];
+  unitTypeOptions: ErpCodeValue[];
   onCreateRequirement: () => void;
   onCreateOffer: () => void;
   onCreateSiteVisit: () => void;
@@ -1292,7 +1381,7 @@ function ProspectDetailPanel({
             <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">{prospect.prospectNo ?? "Prospect number pending"}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <StatusPill status={prospect.status} />
+            <StatusPill status={codeValueKey(prospectStatusOptions, prospect.status)} label={codeValueLabel(prospectStatusOptions, prospect.status)} />
             <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold" onClick={() => onEditProspect(prospect)} type="button">
               <Edit3 className="h-3.5 w-3.5" />
               Edit
@@ -1315,12 +1404,12 @@ function ProspectDetailPanel({
         <DetailItem label="Email" value={prospect.email} />
         <DetailItem label="Fax no" value={prospect.faxNo} />
         <DetailItem label="Address" value={prospect.address} />
-        <DetailItem label="Source" value={prospect.source} />
-        <DetailItem label="Purpose" value={prospect.purpose} />
+        <DetailItem label="Source" value={codeValueLabel(leadSourceOptions, prospect.source)} />
+        <DetailItem label="Purpose" value={codeValueLabel(leadPurposeOptions, prospect.purpose)} />
         <DetailItem label="Commercial need" value={prospect.commercialNeed} />
         <DetailItem label="Company id" value={prospect.companyId === undefined ? undefined : String(prospect.companyId)} />
         <DetailItem label="Lead id" value={prospect.leadId === undefined ? undefined : String(prospect.leadId)} />
-        <DetailItem label="Status" value={prospect.status ? formatLabel(prospect.status) : "New"} />
+        <DetailItem label="Status" value={codeValueLabel(prospectStatusOptions, prospect.status)} />
         <DetailItem label="Created by" value={prospect.createdBy === undefined ? undefined : String(prospect.createdBy)} />
       </div>
 
@@ -1351,9 +1440,9 @@ function ProspectDetailPanel({
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{requirement.propertyName || requirement.unitType || "Requirement"}</p>
+                  <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{requirement.propertyName || codeValueLabel(unitTypeOptions, requirement.unitType) || "Requirement"}</p>
                   <p className="mt-1 text-sm text-[color:var(--foreground-muted)]">
-                    {formatRequirementSummary(requirement)}
+                    {formatRequirementSummary(requirement, requirementLevelOptions, unitTypeOptions)}
                   </p>
                 </div>
                 <Edit3 className="h-4 w-4 shrink-0 text-[color:var(--brand)]" />
@@ -1385,7 +1474,7 @@ function ProspectDetailPanel({
                 <div>
                   <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{formatDateTime(siteVisit.visitAt) || "Site visit"}</p>
                   <p className="mt-1 text-sm text-[color:var(--foreground-muted)]">
-                    {formatSiteVisitSummary(siteVisit)}
+                    {formatSiteVisitSummary(siteVisit, requirementLevelOptions, siteVisitStatusOptions)}
                   </p>
                 </div>
                 <Edit3 className="h-4 w-4 shrink-0 text-[color:var(--brand)]" />
@@ -1406,7 +1495,9 @@ function ProspectDetailPanel({
 
         <div className="mt-4 grid gap-3">
           {offers.length === 0 ? <p className="rounded-lg border border-[color:var(--line)] p-4 text-sm text-[color:var(--foreground-muted)]">No offers created yet.</p> : null}
-          {offers.map((offer) => (
+          {offers.map((offer) => {
+            const offerStatus = codeValueKey(offerStatusOptions, offer.status);
+            return (
             <div
               className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-4 transition hover:border-[color:var(--brand-border)] hover:bg-[color:var(--brand-tint)]"
               key={offer.id ?? `${offer.prospectId}-${offer.unitId}-${offer.finalAmount}`}
@@ -1416,7 +1507,7 @@ function ProspectDetailPanel({
                   <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{offer.offerNo || "Offer"}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {offer.status === "DRAFT" ? (
+                  {offerStatus === "DRAFT" ? (
                     <button aria-label="Edit offer" className="btn-secondary inline-flex h-9 w-9 items-center justify-center rounded-lg" onClick={() => onSelectOffer(offer)} title="Edit offer" type="button">
                       <Edit3 className="h-4 w-4" />
                     </button>
@@ -1432,10 +1523,10 @@ function ProspectDetailPanel({
               </p>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[color:var(--brand-strong)]">
-                  {formatLabel(offer.status ?? "DRAFT")}
+                  {codeValueLabel(offerStatusOptions, offer.status) ?? "Draft"}
                 </span>
                 <div className="flex flex-wrap justify-end gap-2">
-                  {offer.status === "PENDING_APPROVAL" ? (
+                  {offerStatus === "PENDING_APPROVAL" ? (
                     <>
                       <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold" onClick={() => onOfferAction(offer, "approve")} type="button">
                         Approve
@@ -1445,12 +1536,12 @@ function ProspectDetailPanel({
                       </button>
                     </>
                   ) : null}
-                  {offer.status === "APPROVED" ? (
+                  {offerStatus === "APPROVED" ? (
                     <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold" onClick={() => onOfferAction(offer, "send")} type="button">
                       Send
                     </button>
                   ) : null}
-                  {offer.status === "SENT" || offer.status === "NEGOTIATION" ? (
+                  {offerStatus === "SENT" || offerStatus === "NEGOTIATION" ? (
                     <>
                       <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold" onClick={() => onOfferAction(offer, "negotiate")} type="button">
                         Negotiation
@@ -1466,7 +1557,8 @@ function ProspectDetailPanel({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -1477,6 +1569,9 @@ function ProspectDetailPanel({
 function ProspectFormPanel({
   form,
   customerTypeOptions,
+  preferredContactOptions,
+  leadSourceOptions,
+  leadPurposeOptions,
   saving,
   onCancel,
   onChange,
@@ -1484,6 +1579,9 @@ function ProspectFormPanel({
 }: {
   form: ProspectForm;
   customerTypeOptions: ErpCodeValue[];
+  preferredContactOptions: ErpCodeValue[];
+  leadSourceOptions: ErpCodeValue[];
+  leadPurposeOptions: ErpCodeValue[];
   saving: boolean;
   onCancel: () => void;
   onChange: (form: ProspectForm) => void;
@@ -1512,10 +1610,10 @@ function ProspectFormPanel({
       <Field label="Mobile no" required value={form.mobileNo} onChange={(value) => onChange({ ...form, mobileNo: value })} />
       <Field label="Phone no" value={form.phoneNo} onChange={(value) => onChange({ ...form, phoneNo: value })} />
       <Field label="Email" type="email" value={form.email} onChange={(value) => onChange({ ...form, email: value })} />
-      <Select label="Preferred contact" value={form.preferredContactMethod} options={["WhatsApp", "Email", "Phone Call", "SMS"]} onChange={(value) => onChange({ ...form, preferredContactMethod: value })} />
+      <CodeValueSelect label="Preferred contact" value={form.preferredContactMethod === undefined ? "" : String(form.preferredContactMethod)} options={preferredContactOptions} onChange={(value) => onChange({ ...form, preferredContactMethod: numberValue(value) })} />
       <Field label="Fax no" value={form.faxNo} onChange={(value) => onChange({ ...form, faxNo: value })} />
-      <Field label="Source" value={form.source} onChange={(value) => onChange({ ...form, source: value })} />
-      <Select label="Purpose" value={form.purpose} options={["RENT", "BUY", "INVEST"]} onChange={(value) => onChange({ ...form, purpose: value })} />
+      <CodeValueSelect label="Source" value={form.source} options={leadSourceOptions} onChange={(value) => onChange({ ...form, source: value })} />
+      <CodeValueSelect label="Purpose" value={form.purpose} options={leadPurposeOptions} onChange={(value) => onChange({ ...form, purpose: value })} />
       <Field label="Commercial need" value={form.commercialNeed} onChange={(value) => onChange({ ...form, commercialNeed: value })} />
       <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
         Address
@@ -1538,11 +1636,11 @@ function ProspectFormPanel({
   );
 }
 
-function OfferViewPanel({ offer }: { offer: ProspectOffer }) {
+function OfferViewPanel({ offer, offerStatusOptions }: { offer: ProspectOffer; offerStatusOptions: ErpCodeValue[] }) {
   return (
     <div className="grid gap-4">
       <DetailItem label="Offer no" value={offer.offerNo} />
-      <DetailItem label="Status" value={formatLabel(offer.status ?? "DRAFT")} />
+      <DetailItem label="Status" value={codeValueLabel(offerStatusOptions, offer.status)} />
       <DetailItem label="Location" value={formatOfferLocation(offer)} />
       <DetailItem label="Base amount" value={offer.baseAmount === undefined ? undefined : String(offer.baseAmount)} />
       <DetailItem label="Discount amount" value={offer.discountAmount === undefined ? undefined : String(offer.discountAmount)} />
@@ -1559,6 +1657,8 @@ function OfferViewPanel({ offer }: { offer: ProspectOffer }) {
 function ReservationCard({
   prospect,
   reservation,
+  decisionOptions,
+  reservationStatusOptions,
   saving,
   onAction,
   onEdit,
@@ -1566,11 +1666,15 @@ function ReservationCard({
 }: {
   prospect?: Prospect;
   reservation: ProspectReservation;
+  decisionOptions: ErpCodeValue[];
+  reservationStatusOptions: ErpCodeValue[];
   saving: boolean;
   onAction: (reservation: ProspectReservation, action: ReservationAction) => void;
   onEdit: (reservation: ProspectReservation) => void;
   onView: (reservation: ProspectReservation) => void;
 }) {
+  const reservationStatus = codeValueKey(reservationStatusOptions, reservation.status);
+
   return (
     <div className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -1578,14 +1682,14 @@ function ReservationCard({
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{reservation.reservationNo || "Reservation"}</p>
             <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[color:var(--brand-strong)]">
-              {formatLabel(reservation.status ?? "DRAFT")}
+              {codeValueLabel(reservationStatusOptions, reservation.status) ?? "Draft"}
             </span>
           </div>
           <p className="mt-1 text-sm text-[color:var(--foreground-muted)]">{prospect?.customerName || `Prospect ${reservation.prospectId ?? "-"}`}</p>
-          <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">{formatReservationSummary(reservation)}</p>
+          <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">{formatReservationSummary(reservation, reservationStatusOptions, decisionOptions)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {reservation.status === "DRAFT" ? (
+          {reservationStatus === "DRAFT" ? (
             <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onEdit(reservation)} type="button">
               <Edit3 className="h-3.5 w-3.5" />
               Edit
@@ -1596,7 +1700,7 @@ function ReservationCard({
               View
             </button>
           )}
-          {reservation.status === "PENDING_APPROVAL" ? (
+          {reservationStatus === "PENDING_APPROVAL" ? (
             <>
               <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "approve")} type="button">
                 Approve
@@ -1606,27 +1710,27 @@ function ReservationCard({
               </button>
             </>
           ) : null}
-          {reservation.status === "DRAFT" ? (
+          {reservationStatus === "DRAFT" ? (
             <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "submit")} type="button">
               Submit
             </button>
           ) : null}
-          {reservation.status === "PAYMENT_PENDING" ? (
+          {reservationStatus === "PAYMENT_PENDING" ? (
             <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "payment")} type="button">
               Payment
             </button>
           ) : null}
-          {reservation.status === "PAID" ? (
+          {reservationStatus === "PAID" ? (
             <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "confirm")} type="button">
               Confirm
             </button>
           ) : null}
-          {reservation.status === "CONFIRMED" ? (
+          {reservationStatus === "CONFIRMED" ? (
             <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "move")} type="button">
               Create Lease
             </button>
           ) : null}
-          {["REJECTED", "CANCELLED", "EXPIRED", "MOVED_TO_LEASE"].includes(reservation.status ?? "") ? (
+          {["REJECTED", "CANCELLED", "EXPIRED", "MOVED_TO_LEASE"].includes(reservationStatus ?? "") ? (
             <span className="rounded-lg border border-[color:var(--line)] px-3 py-2 text-xs font-semibold text-[color:var(--foreground-muted)]">No action</span>
           ) : null}
         </div>
@@ -1635,17 +1739,29 @@ function ReservationCard({
   );
 }
 
-function ReservationViewPanel({ prospect, reservation }: { prospect?: Prospect; reservation: ProspectReservation }) {
+function ReservationViewPanel({
+  decisionOptions,
+  prospect,
+  reservation,
+  reservationStatusOptions,
+}: {
+  decisionOptions: ErpCodeValue[];
+  prospect?: Prospect;
+  reservation: ProspectReservation;
+  reservationStatusOptions: ErpCodeValue[];
+}) {
   return (
     <div className="grid gap-4">
       <DetailItem label="Reservation no" value={reservation.reservationNo} />
-      <DetailItem label="Status" value={formatLabel(reservation.status ?? "DRAFT")} />
+      <DetailItem label="Status" value={codeValueLabel(reservationStatusOptions, reservation.status)} />
       <DetailItem label="Customer" value={prospect?.customerName} />
       <DetailItem label="Prospect no" value={prospect?.prospectNo} />
       <DetailItem label="Offer id" value={reservation.offerId === undefined ? undefined : String(reservation.offerId)} />
       <DetailItem label="Property id" value={reservation.propertyId === undefined ? undefined : String(reservation.propertyId)} />
+      <DetailItem label="Block id" value={reservation.blockId === undefined ? undefined : String(reservation.blockId)} />
+      <DetailItem label="Floor id" value={reservation.floorId === undefined ? undefined : String(reservation.floorId)} />
       <DetailItem label="Unit id" value={reservation.unitId === undefined ? undefined : String(reservation.unitId)} />
-      <DetailItem label="Approval" value={formatLabel(reservation.approvalStatus ?? "NOT_REQUIRED")} />
+      <DetailItem label="Approval" value={codeValueLabel(decisionOptions, reservation.approvalStatus)} />
       <DetailItem label="Reservation fee" value={reservation.reservationFee === undefined ? undefined : String(reservation.reservationFee)} />
       <DetailItem label="Paid amount" value={reservation.paidAmount === undefined ? undefined : String(reservation.paidAmount)} />
       <DetailItem label="Payment waived" value={reservation.paymentWaived ? "Yes" : "No"} />
@@ -1656,21 +1772,25 @@ function ReservationViewPanel({ prospect, reservation }: { prospect?: Prospect; 
 
 function RequirementFormPanel({
   form,
+  requirementLevelOptions,
   saving,
+  unitTypeOptions,
   onCancel,
   onChange,
   onSubmit,
 }: {
   form: RequirementForm;
+  requirementLevelOptions: ErpCodeValue[];
   saving: boolean;
+  unitTypeOptions: ErpCodeValue[];
   onCancel: () => void;
   onChange: (form: RequirementForm) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
-      <Select label="Requirement level" value={form.requirementLevel} options={["PROPERTY", "BLOCK", "FLOOR", "UNIT"]} onChange={(value) => onChange({ ...form, requirementLevel: value })} />
-      <Select label="Unit type" value={form.unitType} options={["Office", "Retail", "Line shop", "Parking", "Gym", "Kiosk", "Storage", "Other"]} onChange={(value) => onChange({ ...form, unitType: value })} />
+      <CodeValueSelect label="Requirement level" value={form.requirementLevel} options={requirementLevelOptions} onChange={(value) => onChange({ ...form, requirementLevel: value })} />
+      <CodeValueSelect label="Unit type" value={form.unitType} options={unitTypeOptions} onChange={(value) => onChange({ ...form, unitType: value })} />
       <Field label="Bedrooms" type="number" value={form.bedrooms} onChange={(value) => onChange({ ...form, bedrooms: value })} />
       <Field label="Area from" type="number" value={form.areaFrom} onChange={(value) => onChange({ ...form, areaFrom: value })} />
       <Field label="Area to" type="number" value={form.areaTo} onChange={(value) => onChange({ ...form, areaTo: value })} />
@@ -1710,53 +1830,195 @@ function RequirementFormPanel({
 
 function SiteVisitFormPanel({
   form,
-  requirements,
+  requirementLevelOptions,
   saving,
+  siteVisitStatusOptions,
   onCancel,
   onChange,
   onSubmit,
 }: {
   form: SiteVisitForm;
-  requirements: ProspectRequirement[];
+  requirementLevelOptions: ErpCodeValue[];
   saving: boolean;
+  siteVisitStatusOptions: ErpCodeValue[];
   onCancel: () => void;
   onChange: (form: SiteVisitForm) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const propertyOptions = siteVisitPropertyOptions(requirements, form);
-  const blockOptions = siteVisitTextOptions(requirements.map((requirement) => requirement.blockName), form.blockName);
-  const floorOptions = siteVisitTextOptions(requirements.map((requirement) => requirement.floorName), form.floorName);
-  const unitOptions = siteVisitNumberOptions(requirements.map((requirement) => requirement.preferredUnitId), form.unitId);
-  const requiresBlock = form.requirementLevel === "BLOCK" || form.requirementLevel === "FLOOR" || form.requirementLevel === "UNIT";
-  const requiresFloor = form.requirementLevel === "FLOOR" || form.requirementLevel === "UNIT";
-  const requiresUnit = form.requirementLevel === "UNIT";
-  const canSave = Boolean(form.propertyId && form.visitAt && (!requiresBlock || form.blockName) && (!requiresFloor || form.floorName) && (!requiresUnit || form.unitId));
+  const [properties, setProperties] = useState<PropertyMaster[]>([]);
+  const [blocksState, setBlocksState] = useState<{ propertyId: string; items: MasterRecord[] }>({ propertyId: "", items: [] });
+  const [floorsState, setFloorsState] = useState<{ blockId: string; items: MasterRecord[] }>({ blockId: "", items: [] });
+  const [unitsState, setUnitsState] = useState<{ floorId: string; items: MasterRecord[] }>({ floorId: "", items: [] });
+  const blocks = useMemo(() => (blocksState.propertyId === form.propertyId ? blocksState.items : []), [blocksState, form.propertyId]);
+  const floors = useMemo(() => (floorsState.blockId === form.blockId ? floorsState.items : []), [floorsState, form.blockId]);
+  const units = useMemo(() => (unitsState.floorId === form.floorId ? unitsState.items : []), [unitsState, form.floorId]);
+  const propertyOptions = useMemo(
+    () => masterPropertyOptions(properties, form.propertyId, form.propertyName),
+    [form.propertyId, form.propertyName, properties],
+  );
+  const blockOptions = useMemo(
+    () => masterRecordOptions(blocks, form.blockId, form.blockName),
+    [blocks, form.blockId, form.blockName],
+  );
+  const floorOptions = useMemo(
+    () => masterRecordOptions(floors, form.floorId, form.floorName),
+    [floors, form.floorId, form.floorName],
+  );
+  const unitOptions = useMemo(
+    () => masterRecordOptions(units, form.unitId, form.unitId ? `Unit ${form.unitId}` : ""),
+    [form.unitId, units],
+  );
+  const requirementLevelKey = codeValueKey(requirementLevelOptions, numberValue(form.requirementLevel));
+  const requiresBlock = requirementLevelKey === "BLOCK" || requirementLevelKey === "FLOOR" || requirementLevelKey === "UNIT";
+  const requiresFloor = requirementLevelKey === "FLOOR" || requirementLevelKey === "UNIT";
+  const requiresUnit = requirementLevelKey === "UNIT";
+  const canSave = Boolean(form.propertyId && form.visitAt && (!requiresBlock || form.blockId) && (!requiresFloor || form.floorId) && (!requiresUnit || form.unitId));
+
+  useEffect(() => {
+    let active = true;
+    listProperties({ pageSize: 100 })
+      .then((items) => {
+        if (active) {
+          setProperties(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProperties([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!form.propertyId) {
+      return;
+    }
+    let active = true;
+    listBlocks(Number(form.propertyId))
+      .then((items) => {
+        if (active) {
+          setBlocksState({ propertyId: form.propertyId, items });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setBlocksState({ propertyId: form.propertyId, items: [] });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.propertyId]);
+
+  useEffect(() => {
+    if (!form.blockId) {
+      return;
+    }
+    let active = true;
+    listFloors(Number(form.blockId))
+      .then((items) => {
+        if (active) {
+          setFloorsState({ blockId: form.blockId, items });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFloorsState({ blockId: form.blockId, items: [] });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.blockId]);
+
+  useEffect(() => {
+    if (!form.floorId) {
+      return;
+    }
+    let active = true;
+    listUnits(Number(form.floorId))
+      .then((items) => {
+        if (active) {
+          setUnitsState({ floorId: form.floorId, items });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setUnitsState({ floorId: form.floorId, items: [] });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.floorId]);
 
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
-      <Select label="Requirement level" value={form.requirementLevel} options={["PROPERTY", "BLOCK", "FLOOR", "UNIT"]} onChange={(value) => onChange({ ...form, requirementLevel: value, blockName: value === "PROPERTY" ? "" : form.blockName, floorName: value === "FLOOR" || value === "UNIT" ? form.floorName : "", unitId: value === "UNIT" ? form.unitId : "" })} />
-      {propertyOptions.length > 0 ? (
+      <CodeValueSelect
+        label="Requirement level"
+        value={form.requirementLevel}
+        options={requirementLevelOptions}
+        onChange={(value) =>
+          onChange({
+            ...form,
+            requirementLevel: value,
+            blockId: codeValueKey(requirementLevelOptions, numberValue(value)) === "PROPERTY" ? "" : form.blockId,
+            blockName: codeValueKey(requirementLevelOptions, numberValue(value)) === "PROPERTY" ? "" : form.blockName,
+            floorId: ["FLOOR", "UNIT"].includes(codeValueKey(requirementLevelOptions, numberValue(value)) ?? "") ? form.floorId : "",
+            floorName: ["FLOOR", "UNIT"].includes(codeValueKey(requirementLevelOptions, numberValue(value)) ?? "") ? form.floorName : "",
+            unitId: codeValueKey(requirementLevelOptions, numberValue(value)) === "UNIT" ? form.unitId : "",
+          })
+        }
+      />
+      <OptionSelect
+        label="Property"
+        options={propertyOptions}
+        required
+        value={form.propertyId}
+        onChange={(value) => {
+          const property = properties.find((item) => item.id !== undefined && String(item.id) === value);
+          onChange({
+            ...form,
+            propertyId: value,
+            propertyName: property?.name ?? "",
+            blockId: "",
+            blockName: "",
+            floorId: "",
+            floorName: "",
+            unitId: "",
+          });
+        }}
+      />
+      {requiresBlock ? (
         <OptionSelect
-          label="Property"
-          options={propertyOptions}
+          label="Block / building"
+          options={blockOptions}
           required
-          value={form.propertyId}
+          value={form.blockId}
           onChange={(value) => {
-            const property = propertyOptions.find((option) => option.value === value);
-            onChange({ ...form, propertyId: value, propertyName: propertyDisplayName(property?.label) ?? "" });
+            const block = blocks.find((item) => item.id !== undefined && String(item.id) === value);
+            onChange({ ...form, blockId: value, blockName: block?.name ?? "", floorId: "", floorName: "", unitId: "" });
           }}
         />
-      ) : (
-        <>
-          <Field label="Property id" required type="number" value={form.propertyId} onChange={(value) => onChange({ ...form, propertyId: value })} />
-          <Field label="Property name" value={form.propertyName} onChange={(value) => onChange({ ...form, propertyName: value })} />
-        </>
-      )}
-      {requiresBlock ? blockOptions.length > 0 ? <OptionSelect label="Block / building" options={blockOptions} required value={form.blockName} onChange={(value) => onChange({ ...form, blockName: value })} /> : <Field label="Block / building" required value={form.blockName} onChange={(value) => onChange({ ...form, blockName: value })} /> : null}
-      {requiresFloor ? floorOptions.length > 0 ? <OptionSelect label="Floor" options={floorOptions} required value={form.floorName} onChange={(value) => onChange({ ...form, floorName: value })} /> : <Field label="Floor" required value={form.floorName} onChange={(value) => onChange({ ...form, floorName: value })} /> : null}
-      {requiresUnit ? unitOptions.length > 0 ? <OptionSelect label="Unit" options={unitOptions} required value={form.unitId} onChange={(value) => onChange({ ...form, unitId: value })} /> : <Field label="Unit id" required type="number" value={form.unitId} onChange={(value) => onChange({ ...form, unitId: value })} /> : null}
+      ) : null}
+      {requiresFloor ? (
+        <OptionSelect
+          label="Floor"
+          options={floorOptions}
+          required
+          value={form.floorId}
+          onChange={(value) => {
+            const floor = floors.find((item) => item.id !== undefined && String(item.id) === value);
+            onChange({ ...form, floorId: value, floorName: floor?.name ?? "", unitId: "" });
+          }}
+        />
+      ) : null}
+      {requiresUnit ? <OptionSelect label="Unit" options={unitOptions} required value={form.unitId} onChange={(value) => onChange({ ...form, unitId: value })} /> : null}
       <Field label="Visit date and time" required type="datetime-local" value={form.visitAt} onChange={(value) => onChange({ ...form, visitAt: value })} />
-      <Select label="Status" value={form.status} options={["SCHEDULED", "COMPLETED", "CANCELLED"]} onChange={(value) => onChange({ ...form, status: value })} />
+      <CodeValueSelect label="Status" value={form.status} options={siteVisitStatusOptions} onChange={(value) => onChange({ ...form, status: value })} />
       <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
         Notes
         <textarea className="field min-h-28 rounded-lg px-3 py-3 text-sm" value={form.notes} onChange={(event) => onChange({ ...form, notes: event.target.value })} />
@@ -1776,51 +2038,191 @@ function SiteVisitFormPanel({
 
 function OfferFormPanel({
   form,
-  requirements,
+  requirementLevelOptions,
   saving,
   onCancel,
   onChange,
   onSubmit,
 }: {
   form: OfferForm;
-  requirements: ProspectRequirement[];
+  requirementLevelOptions: ErpCodeValue[];
   saving: boolean;
   onCancel: () => void;
   onChange: (form: OfferForm) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const propertyOptions = siteVisitPropertyOptions(requirements, form);
-  const blockOptions = siteVisitTextOptions(requirements.map((requirement) => requirement.blockName), form.blockName);
-  const floorOptions = siteVisitTextOptions(requirements.map((requirement) => requirement.floorName), form.floorName);
-  const unitOptions = siteVisitNumberOptions(requirements.map((requirement) => requirement.preferredUnitId), form.unitId);
-  const requiresBlock = form.requirementLevel === "BLOCK" || form.requirementLevel === "FLOOR" || form.requirementLevel === "UNIT";
-  const requiresFloor = form.requirementLevel === "FLOOR" || form.requirementLevel === "UNIT";
-  const requiresUnit = form.requirementLevel === "UNIT";
-  const canSave = Boolean(form.propertyId && form.baseAmount && (!requiresBlock || form.blockName) && (!requiresFloor || form.floorName) && (!requiresUnit || form.unitId));
+  const [properties, setProperties] = useState<PropertyMaster[]>([]);
+  const [blocksState, setBlocksState] = useState<{ propertyId: string; items: MasterRecord[] }>({ propertyId: "", items: [] });
+  const [floorsState, setFloorsState] = useState<{ blockId: string; items: MasterRecord[] }>({ blockId: "", items: [] });
+  const [unitsState, setUnitsState] = useState<{ floorId: string; items: MasterRecord[] }>({ floorId: "", items: [] });
+  const blocks = useMemo(() => (blocksState.propertyId === form.propertyId ? blocksState.items : []), [blocksState, form.propertyId]);
+  const floors = useMemo(() => (floorsState.blockId === form.blockId ? floorsState.items : []), [floorsState, form.blockId]);
+  const units = useMemo(() => (unitsState.floorId === form.floorId ? unitsState.items : []), [unitsState, form.floorId]);
+  const propertyOptions = useMemo(
+    () => masterPropertyOptions(properties, form.propertyId, form.propertyName),
+    [form.propertyId, form.propertyName, properties],
+  );
+  const blockOptions = useMemo(
+    () => masterRecordOptions(blocks, form.blockId, form.blockName),
+    [blocks, form.blockId, form.blockName],
+  );
+  const floorOptions = useMemo(
+    () => masterRecordOptions(floors, form.floorId, form.floorName),
+    [floors, form.floorId, form.floorName],
+  );
+  const unitOptions = useMemo(
+    () => masterRecordOptions(units, form.unitId, form.unitId ? `Unit ${form.unitId}` : ""),
+    [form.unitId, units],
+  );
+  const requirementLevelKey = codeValueKey(requirementLevelOptions, numberValue(form.requirementLevel));
+  const requiresBlock = requirementLevelKey === "BLOCK" || requirementLevelKey === "FLOOR" || requirementLevelKey === "UNIT";
+  const requiresFloor = requirementLevelKey === "FLOOR" || requirementLevelKey === "UNIT";
+  const requiresUnit = requirementLevelKey === "UNIT";
+  const canSave = Boolean(form.propertyId && form.baseAmount && (!requiresBlock || form.blockId) && (!requiresFloor || form.floorId) && (!requiresUnit || form.unitId));
+
+  useEffect(() => {
+    let active = true;
+    listProperties({ pageSize: 100 })
+      .then((items) => {
+        if (active) {
+          setProperties(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProperties([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!form.propertyId) {
+      return;
+    }
+    let active = true;
+    listBlocks(Number(form.propertyId))
+      .then((items) => {
+        if (active) {
+          setBlocksState({ propertyId: form.propertyId, items });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setBlocksState({ propertyId: form.propertyId, items: [] });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.propertyId]);
+
+  useEffect(() => {
+    if (!form.blockId) {
+      return;
+    }
+    let active = true;
+    listFloors(Number(form.blockId))
+      .then((items) => {
+        if (active) {
+          setFloorsState({ blockId: form.blockId, items });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFloorsState({ blockId: form.blockId, items: [] });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.blockId]);
+
+  useEffect(() => {
+    if (!form.floorId) {
+      return;
+    }
+    let active = true;
+    listUnits(Number(form.floorId))
+      .then((items) => {
+        if (active) {
+          setUnitsState({ floorId: form.floorId, items });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setUnitsState({ floorId: form.floorId, items: [] });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.floorId]);
 
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
-      <Select label="Requirement level" value={form.requirementLevel} options={["PROPERTY", "BLOCK", "FLOOR", "UNIT"]} onChange={(value) => onChange({ ...form, requirementLevel: value, blockName: value === "PROPERTY" ? "" : form.blockName, floorName: value === "FLOOR" || value === "UNIT" ? form.floorName : "", unitId: value === "UNIT" ? form.unitId : "" })} />
-      {propertyOptions.length > 0 ? (
+      <CodeValueSelect
+        label="Requirement level"
+        value={form.requirementLevel}
+        options={requirementLevelOptions}
+        onChange={(value) =>
+          onChange({
+            ...form,
+            requirementLevel: value,
+            blockId: codeValueKey(requirementLevelOptions, numberValue(value)) === "PROPERTY" ? "" : form.blockId,
+            blockName: codeValueKey(requirementLevelOptions, numberValue(value)) === "PROPERTY" ? "" : form.blockName,
+            floorId: ["FLOOR", "UNIT"].includes(codeValueKey(requirementLevelOptions, numberValue(value)) ?? "") ? form.floorId : "",
+            floorName: ["FLOOR", "UNIT"].includes(codeValueKey(requirementLevelOptions, numberValue(value)) ?? "") ? form.floorName : "",
+            unitId: codeValueKey(requirementLevelOptions, numberValue(value)) === "UNIT" ? form.unitId : "",
+          })
+        }
+      />
+      <OptionSelect
+        label="Property"
+        options={propertyOptions}
+        required
+        value={form.propertyId}
+        onChange={(value) => {
+          const property = properties.find((item) => item.id !== undefined && String(item.id) === value);
+          onChange({
+            ...form,
+            propertyId: value,
+            propertyName: property?.name ?? "",
+            blockId: "",
+            blockName: "",
+            floorId: "",
+            floorName: "",
+            unitId: "",
+          });
+        }}
+      />
+      {requiresBlock ? (
         <OptionSelect
-          label="Property"
-          options={propertyOptions}
+          label="Block / building"
+          options={blockOptions}
           required
-          value={form.propertyId}
+          value={form.blockId}
           onChange={(value) => {
-            const property = propertyOptions.find((option) => option.value === value);
-            onChange({ ...form, propertyId: value, propertyName: propertyDisplayName(property?.label) ?? "" });
+            const block = blocks.find((item) => item.id !== undefined && String(item.id) === value);
+            onChange({ ...form, blockId: value, blockName: block?.name ?? "", floorId: "", floorName: "", unitId: "" });
           }}
         />
-      ) : (
-        <>
-          <Field label="Property id" required type="number" value={form.propertyId} onChange={(value) => onChange({ ...form, propertyId: value })} />
-          <Field label="Property name" value={form.propertyName} onChange={(value) => onChange({ ...form, propertyName: value })} />
-        </>
-      )}
-      {requiresBlock ? blockOptions.length > 0 ? <OptionSelect label="Block / building" options={blockOptions} required value={form.blockName} onChange={(value) => onChange({ ...form, blockName: value })} /> : <Field label="Block / building" required value={form.blockName} onChange={(value) => onChange({ ...form, blockName: value })} /> : null}
-      {requiresFloor ? floorOptions.length > 0 ? <OptionSelect label="Floor" options={floorOptions} required value={form.floorName} onChange={(value) => onChange({ ...form, floorName: value })} /> : <Field label="Floor" required value={form.floorName} onChange={(value) => onChange({ ...form, floorName: value })} /> : null}
-      {requiresUnit ? unitOptions.length > 0 ? <OptionSelect label="Unit" options={unitOptions} required value={form.unitId} onChange={(value) => onChange({ ...form, unitId: value })} /> : <Field label="Unit id" required type="number" value={form.unitId} onChange={(value) => onChange({ ...form, unitId: value })} /> : null}
+      ) : null}
+      {requiresFloor ? (
+        <OptionSelect
+          label="Floor"
+          options={floorOptions}
+          required
+          value={form.floorId}
+          onChange={(value) => {
+            const floor = floors.find((item) => item.id !== undefined && String(item.id) === value);
+            onChange({ ...form, floorId: value, floorName: floor?.name ?? "", unitId: "" });
+          }}
+        />
+      ) : null}
+      {requiresUnit ? <OptionSelect label="Unit" options={unitOptions} required value={form.unitId} onChange={(value) => onChange({ ...form, unitId: value })} /> : null}
       <Field label="Base amount" type="number" value={form.baseAmount} onChange={(value) => onChange({ ...form, baseAmount: value })} />
       <Field label="Discount amount" type="number" value={form.discountAmount} onChange={(value) => onChange({ ...form, discountAmount: value })} />
       <Field label="Final amount" type="number" value={form.finalAmount} onChange={(value) => onChange({ ...form, finalAmount: value })} />
@@ -2040,11 +2442,11 @@ function prospectToForm(prospect: Prospect): ProspectForm {
     mobileNo: prospect.mobileNo ?? "",
     phoneNo: prospect.phoneNo ?? "",
     email: prospect.email ?? "",
-    preferredContactMethod: prospect.preferredContactMethod ?? "WhatsApp",
+    preferredContactMethod: prospect.preferredContactMethod,
     faxNo: prospect.faxNo ?? "",
     address: prospect.address ?? "",
-    source: prospect.source ?? "",
-    purpose: prospect.purpose ?? "RENT",
+    source: prospect.source === undefined ? "" : String(prospect.source),
+    purpose: prospect.purpose === undefined ? "" : String(prospect.purpose),
     commercialNeed: prospect.commercialNeed ?? "",
     documentNotes: prospect.documentNotes ?? "",
   };
@@ -2065,11 +2467,11 @@ function formToProspect(form: ProspectForm): Prospect {
     mobileNo: form.mobileNo.trim(),
     phoneNo: emptyToUndefined(form.phoneNo),
     email: emptyToUndefined(form.email),
-    preferredContactMethod: emptyToUndefined(form.preferredContactMethod),
+    preferredContactMethod: form.preferredContactMethod,
     faxNo: emptyToUndefined(form.faxNo),
     address: emptyToUndefined(form.address),
-    source: emptyToUndefined(form.source),
-    purpose: emptyToUndefined(form.purpose),
+    source: numberValue(form.source),
+    purpose: numberValue(form.purpose),
     commercialNeed: emptyToUndefined(form.commercialNeed),
     documentNotes: emptyToUndefined(form.documentNotes),
   };
@@ -2083,11 +2485,11 @@ function requirementToForm(requirement?: ProspectRequirement): RequirementForm |
     id: requirement.id,
     propertyId: requirement.propertyId === undefined ? "" : String(requirement.propertyId),
     propertyName: requirement.propertyName ?? "",
-    requirementLevel: requirement.requirementLevel ?? "PROPERTY",
+    requirementLevel: requirement.requirementLevel === undefined ? "" : String(requirement.requirementLevel),
     blockName: requirement.blockName ?? "",
     floorName: requirement.floorName ?? "",
     preferredUnitId: requirement.preferredUnitId === undefined ? "" : String(requirement.preferredUnitId),
-    unitType: requirement.unitType ?? "Office",
+    unitType: requirement.unitType === undefined ? "" : String(requirement.unitType),
     bedrooms: requirement.bedrooms === undefined ? "" : String(requirement.bedrooms),
     areaFrom: requirement.areaFrom === undefined ? "" : String(requirement.areaFrom),
     areaTo: requirement.areaTo === undefined ? "" : String(requirement.areaTo),
@@ -2107,8 +2509,8 @@ function formToRequirement(form: RequirementForm, prospectId: number): ProspectR
   return {
     id: form.id,
     prospectId,
-    requirementLevel: emptyToUndefined(form.requirementLevel),
-    unitType: emptyToUndefined(form.unitType),
+    requirementLevel: numberValue(form.requirementLevel),
+    unitType: numberValue(form.unitType),
     bedrooms: numberValue(form.bedrooms),
     areaFrom: numberValue(form.areaFrom),
     areaTo: numberValue(form.areaTo),
@@ -2130,8 +2532,10 @@ function initialSiteVisitFormForRequirements(requirements: ProspectRequirement[]
     ...initialSiteVisitForm,
     propertyId: requirement?.propertyId === undefined ? "" : String(requirement.propertyId),
     propertyName: requirement?.propertyName ?? "",
-    requirementLevel: requirement?.requirementLevel ?? "PROPERTY",
+    requirementLevel: requirement?.requirementLevel === undefined ? "" : String(requirement.requirementLevel),
+    blockId: "",
     blockName: requirement?.blockName ?? "",
+    floorId: "",
     floorName: requirement?.floorName ?? "",
     unitId: requirement?.preferredUnitId === undefined ? "" : String(requirement.preferredUnitId),
   };
@@ -2143,42 +2547,45 @@ function initialOfferFormForRequirements(requirements: ProspectRequirement[]): O
     ...initialOfferForm,
     propertyId: requirement?.propertyId === undefined ? "" : String(requirement.propertyId),
     propertyName: requirement?.propertyName ?? "",
-    requirementLevel: requirement?.requirementLevel ?? "PROPERTY",
+    requirementLevel: requirement?.requirementLevel === undefined ? "" : String(requirement.requirementLevel),
+    blockId: "",
     blockName: requirement?.blockName ?? "",
+    floorId: "",
     floorName: requirement?.floorName ?? "",
     unitId: requirement?.preferredUnitId === undefined ? "" : String(requirement.preferredUnitId),
   };
 }
 
-function siteVisitPropertyOptions(requirements: ProspectRequirement[], form: SiteVisitForm | OfferForm): SelectOption[] {
-  const options = requirements.flatMap((requirement) =>
-    requirement.propertyId === undefined
+function masterPropertyOptions(properties: PropertyMaster[], currentId: string, currentName: string): SelectOption[] {
+  const options = properties.flatMap((property) =>
+    property.id === undefined
       ? []
       : [
           {
-            value: String(requirement.propertyId),
-            label: requirement.propertyName ? `${requirement.propertyName} (${requirement.propertyId})` : `Property ${requirement.propertyId}`,
+            value: String(property.id),
+            label: property.name ? `${property.name} (${property.id})` : `Property ${property.id}`,
           },
         ],
   );
-  if (form.propertyId && !options.some((option) => option.value === form.propertyId)) {
-    options.push({ value: form.propertyId, label: form.propertyName ? `${form.propertyName} (${form.propertyId})` : `Property ${form.propertyId}` });
+  if (currentId && !options.some((option) => option.value === currentId)) {
+    options.push({ value: currentId, label: currentName ? `${currentName} (${currentId})` : `Property ${currentId}` });
   }
   return uniqueOptions(options);
 }
 
-function siteVisitTextOptions(values: Array<string | undefined>, currentValue: string): SelectOption[] {
-  const options = values.flatMap((value) => (value ? [{ value, label: value }] : []));
-  if (currentValue && !options.some((option) => option.value === currentValue)) {
-    options.push({ value: currentValue, label: currentValue });
-  }
-  return uniqueOptions(options);
-}
-
-function siteVisitNumberOptions(values: Array<number | undefined>, currentValue: string): SelectOption[] {
-  const options = values.flatMap((value) => (value === undefined ? [] : [{ value: String(value), label: `Unit ${value}` }]));
-  if (currentValue && !options.some((option) => option.value === currentValue)) {
-    options.push({ value: currentValue, label: `Unit ${currentValue}` });
+function masterRecordOptions(records: MasterRecord[], currentId: string, currentName: string): SelectOption[] {
+  const options = records.flatMap((record) =>
+    record.id === undefined
+      ? []
+      : [
+          {
+            value: String(record.id),
+            label: record.code ? `${record.code} - ${record.name}` : record.name || `Record ${record.id}`,
+          },
+        ],
+  );
+  if (currentId && !options.some((option) => option.value === currentId)) {
+    options.push({ value: currentId, label: currentName || `Record ${currentId}` });
   }
   return uniqueOptions(options);
 }
@@ -2202,12 +2609,14 @@ function siteVisitToForm(siteVisit?: ProspectSiteVisit): SiteVisitForm | null {
     id: siteVisit.id,
     propertyId: siteVisit.propertyId === undefined ? "" : String(siteVisit.propertyId),
     propertyName: siteVisit.propertyName ?? "",
-    requirementLevel: siteVisit.requirementLevel ?? "PROPERTY",
+    requirementLevel: siteVisit.requirementLevel === undefined ? "" : String(siteVisit.requirementLevel),
+    blockId: siteVisit.blockId === undefined ? "" : String(siteVisit.blockId),
     blockName: siteVisit.blockName ?? "",
+    floorId: siteVisit.floorId === undefined ? "" : String(siteVisit.floorId),
     floorName: siteVisit.floorName ?? "",
     unitId: siteVisit.unitId === undefined ? "" : String(siteVisit.unitId),
     visitAt: toDateTimeLocal(siteVisit.visitAt),
-    status: siteVisit.status ?? "SCHEDULED",
+    status: siteVisit.status === undefined ? "" : String(siteVisit.status),
     notes: siteVisit.notes ?? "",
   };
 }
@@ -2218,12 +2627,14 @@ function formToSiteVisit(form: SiteVisitForm, prospectId: number): ProspectSiteV
     prospectId,
     propertyId: numberValue(form.propertyId),
     propertyName: emptyToUndefined(form.propertyName),
-    requirementLevel: emptyToUndefined(form.requirementLevel),
+    requirementLevel: numberValue(form.requirementLevel),
+    blockId: numberValue(form.blockId),
     blockName: emptyToUndefined(form.blockName),
+    floorId: numberValue(form.floorId),
     floorName: emptyToUndefined(form.floorName),
     unitId: numberValue(form.unitId),
     visitAt: emptyToUndefined(form.visitAt),
-    status: emptyToUndefined(form.status),
+    status: numberValue(form.status),
     notes: emptyToUndefined(form.notes),
   };
 }
@@ -2236,15 +2647,17 @@ function offerToForm(offer?: ProspectOffer): OfferForm | null {
     id: offer.id,
     propertyId: offer.propertyId === undefined ? "" : String(offer.propertyId),
     propertyName: offer.propertyName ?? "",
-    requirementLevel: offer.requirementLevel ?? "PROPERTY",
+    requirementLevel: offer.requirementLevel === undefined ? "" : String(offer.requirementLevel),
+    blockId: offer.blockId === undefined ? "" : String(offer.blockId),
     blockName: offer.blockName ?? "",
+    floorId: offer.floorId === undefined ? "" : String(offer.floorId),
     floorName: offer.floorName ?? "",
     unitId: offer.unitId === undefined ? "" : String(offer.unitId),
     baseAmount: offer.baseAmount === undefined ? "" : String(offer.baseAmount),
     discountAmount: offer.discountAmount === undefined ? "" : String(offer.discountAmount),
     finalAmount: offer.finalAmount === undefined ? "" : String(offer.finalAmount),
     specialTerms: offer.specialTerms ?? "",
-    status: offer.status ?? "DRAFT",
+    status: offer.status === undefined ? "" : String(offer.status),
   };
 }
 
@@ -2254,15 +2667,17 @@ function formToOffer(form: OfferForm, prospectId: number): ProspectOffer {
     prospectId,
     propertyId: numberValue(form.propertyId),
     propertyName: emptyToUndefined(form.propertyName),
-    requirementLevel: emptyToUndefined(form.requirementLevel),
+    requirementLevel: numberValue(form.requirementLevel),
+    blockId: numberValue(form.blockId),
     blockName: emptyToUndefined(form.blockName),
+    floorId: numberValue(form.floorId),
     floorName: emptyToUndefined(form.floorName),
     unitId: numberValue(form.unitId),
     baseAmount: numberValue(form.baseAmount),
     discountAmount: numberValue(form.discountAmount),
     finalAmount: numberValue(form.finalAmount),
     specialTerms: emptyToUndefined(form.specialTerms),
-    status: emptyToUndefined(form.status),
+    status: numberValue(form.status),
   };
 }
 
@@ -2282,7 +2697,7 @@ function reservationToForm(reservation: ProspectReservation): ReservationForm {
     reservationFee: reservation.reservationFee === undefined ? "" : String(reservation.reservationFee),
     paymentWaived: Boolean(reservation.paymentWaived),
     expiresAt: toDateTimeLocal(reservation.expiresAt),
-    status: reservation.status ?? "DRAFT",
+    status: reservation.status === undefined ? "" : String(reservation.status),
   };
 }
 
@@ -2294,7 +2709,7 @@ function formToReservation(form: ReservationForm, prospectId: number): ProspectR
     reservationFee: numberValue(form.reservationFee),
     paymentWaived: form.paymentWaived,
     expiresAt: emptyToUndefined(form.expiresAt),
-    status: emptyToUndefined(form.status),
+    status: numberValue(form.status),
   };
 }
 
@@ -2311,20 +2726,39 @@ function numberValue(value: string): number | undefined {
   return Number.isFinite(numeric) && value.trim() !== "" ? numeric : undefined;
 }
 
+function codeValueLabel(options: ErpCodeValue[], value?: number) {
+  if (value === undefined) {
+    return undefined;
+  }
+  return options.find((option) => option.id === value)?.value ?? String(value);
+}
+
+function codeValueKey(options: ErpCodeValue[], value?: number) {
+  return codeValueKeyFromText(codeValueLabel(options, value));
+}
+
+function codeValueIdByKey(options: ErpCodeValue[], key: string) {
+  return options.find((option) => codeValueKeyFromText(option.value) === key)?.id;
+}
+
+function codeValueKeyFromText(value?: string) {
+  return value?.trim().replaceAll(" ", "_").replaceAll("-", "_").toUpperCase();
+}
+
 function emptyToUndefined(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
 }
 
-function formatRequirementSummary(requirement: ProspectRequirement) {
+function formatRequirementSummary(requirement: ProspectRequirement, requirementLevelOptions: ErpCodeValue[], unitTypeOptions: ErpCodeValue[]) {
   const budget = requirement.budgetFrom || requirement.budgetTo ? `${requirement.budgetFrom ?? "-"} to ${requirement.budgetTo ?? "-"}` : "Budget pending";
   const area = requirement.areaFrom || requirement.areaTo ? `Area ${requirement.areaFrom ?? "-"} to ${requirement.areaTo ?? "-"}` : undefined;
-  return [requirement.unitType, area, budget, requirement.moveInDate].filter(Boolean).join(" | ");
+  return [codeValueLabel(requirementLevelOptions, requirement.requirementLevel), codeValueLabel(unitTypeOptions, requirement.unitType), area, budget, requirement.moveInDate].filter(Boolean).join(" | ");
 }
 
-function formatSiteVisitSummary(siteVisit: ProspectSiteVisit) {
+function formatSiteVisitSummary(siteVisit: ProspectSiteVisit, requirementLevelOptions: ErpCodeValue[], siteVisitStatusOptions: ErpCodeValue[]) {
   const location = [propertyDisplayName(siteVisit.propertyName), siteVisit.blockName, siteVisit.floorName, siteVisit.unitId === undefined ? undefined : `Unit ${siteVisit.unitId}`].filter(Boolean).join(" / ");
-  return [location || "Location pending", formatLabel(siteVisit.status ?? "SCHEDULED"), siteVisit.notes].filter(Boolean).join(" | ");
+  return [codeValueLabel(requirementLevelOptions, siteVisit.requirementLevel), location || "Location pending", codeValueLabel(siteVisitStatusOptions, siteVisit.status), siteVisit.notes].filter(Boolean).join(" | ");
 }
 
 function formatOfferSummary(offer: ProspectOffer) {
@@ -2347,15 +2781,18 @@ function propertyDisplayName(value?: string) {
   return value?.replace(/\s+\(\d+\)$/, "");
 }
 
-function formatReservationSummary(reservation: ProspectReservation) {
+function formatReservationSummary(reservation: ProspectReservation, reservationStatusOptions: ErpCodeValue[], decisionOptions: ErpCodeValue[]) {
   return [
     `Offer ${reservation.offerId ?? "-"}`,
-    `Unit ${reservation.unitId ?? "-"}`,
-    formatLabel(reservation.status ?? "DRAFT"),
-    `Approval ${formatLabel(reservation.approvalStatus ?? "NOT_REQUIRED")}`,
+    `Property ${reservation.propertyId ?? "-"}`,
+    reservation.blockId === undefined ? undefined : `Block ${reservation.blockId}`,
+    reservation.floorId === undefined ? undefined : `Floor ${reservation.floorId}`,
+    reservation.unitId === undefined ? undefined : `Unit ${reservation.unitId}`,
+    codeValueLabel(reservationStatusOptions, reservation.status),
+    `Approval ${codeValueLabel(decisionOptions, reservation.approvalStatus) ?? "-"}`,
     `Fee ${reservation.reservationFee ?? 0}`,
     `Paid ${reservation.paidAmount ?? 0}`,
-  ].join(" | ");
+  ].filter(Boolean).join(" | ");
 }
 
 function toDateTimeLocal(value?: string) {
@@ -2429,8 +2866,8 @@ function DetailItem({ label, value }: { label: string; value?: string }) {
   );
 }
 
-function StatusPill({ status }: { status?: string }) {
-  const label = status ? formatLabel(status) : "New";
+function StatusPill({ status, label }: { status?: string; label?: string }) {
+  const displayLabel = label ?? (status ? formatLabel(status) : "New");
   const normalizedStatus = normalizeStatus(status);
   const tone = matchesStatus(normalizedStatus, [...prospectStageStatuses, "PROSPECT", "REQUIREMENT", "SITE_VISIT", "OFFER", "NEGOTIATION", "RESERVATION", "RESERVED", "LEASE_PROCESS"])
     ? "pill-success"
@@ -2438,7 +2875,7 @@ function StatusPill({ status }: { status?: string }) {
       ? "pill-danger"
       : "pill-brand";
 
-  return <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{label}</span>;
+  return <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{displayLabel}</span>;
 }
 
 function SmallPill({ label }: { label: string }) {

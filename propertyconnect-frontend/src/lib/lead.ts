@@ -15,9 +15,9 @@ export type Lead = {
   contactPerson?: string;
   mobileNo: string;
   email?: string;
-  preferredContactMethod?: string;
-  purpose?: string;
-  status?: string;
+  preferredContactMethod?: number;
+  purpose?: number;
+  status?: number;
   qualificationScore?: number;
   qualificationNotes?: string;
   createdBy?: number;

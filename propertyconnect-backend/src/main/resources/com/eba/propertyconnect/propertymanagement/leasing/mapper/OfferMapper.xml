@@ -7,8 +7,10 @@
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
 		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
-		<result column="requirement_level" property="requirementLevel" jdbcType="VARCHAR" />
+		<result column="requirement_level" property="requirementLevel" jdbcType="INTEGER" />
+		<result column="block_id" property="blockId" jdbcType="BIGINT" />
 		<result column="block_name" property="blockName" jdbcType="VARCHAR" />
+		<result column="floor_id" property="floorId" jdbcType="BIGINT" />
 		<result column="floor_name" property="floorName" jdbcType="VARCHAR" />
 		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
 		<result column="offer_no" property="offerNo" jdbcType="VARCHAR" />
@@ -16,7 +18,7 @@
 		<result column="discount_amount" property="discountAmount" jdbcType="DECIMAL" />
 		<result column="final_amount" property="finalAmount" jdbcType="DECIMAL" />
 		<result column="special_terms" property="specialTerms" jdbcType="VARCHAR" />
-		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="INTEGER" />
 		<result column="approval_required" property="approvalRequired" jdbcType="BIT" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
 		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
@@ -25,11 +27,11 @@
 	</resultMap>
 	<insert id="createOffer" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Offer">
 		INSERT INTO pa_txn_leasing_offer (
-			company_id, prospect_id, property_id, property_name, requirement_level, block_name, floor_name, unit_id,
+			company_id, prospect_id, property_id, property_name, requirement_level, block_id, block_name, floor_id, floor_name, unit_id,
 			offer_no, base_amount, discount_amount, final_amount, special_terms, status, approval_required, created_by
 		)
 		VALUES (
-			#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{requirementLevel}, #{blockName}, #{floorName}, #{unitId},
+			#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{requirementLevel}, #{blockId}, #{blockName}, #{floorId}, #{floorName}, #{unitId},
 			#{offerNo}, #{baseAmount}, #{discountAmount}, #{finalAmount}, #{specialTerms}, #{status}, #{approvalRequired}, #{createdBy}
 		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
@@ -51,7 +53,9 @@
 			property_id = #{propertyId},
 			property_name = #{propertyName},
 			requirement_level = #{requirementLevel},
+			block_id = #{blockId},
 			block_name = #{blockName},
+			floor_id = #{floorId},
 			floor_name = #{floorName},
 			unit_id = #{unitId},
 			base_amount = #{baseAmount},

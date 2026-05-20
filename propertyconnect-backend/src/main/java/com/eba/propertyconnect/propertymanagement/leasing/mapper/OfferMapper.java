@@ -20,5 +20,5 @@ public interface OfferMapper {
 
 	public int updateOffer(Offer offer);
 
-	public int updateOfferStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);
+	public int updateOfferStatus(@Param("id") Long id, @Param("status") Integer status, @Param("updatedBy") Long updatedBy);
 }

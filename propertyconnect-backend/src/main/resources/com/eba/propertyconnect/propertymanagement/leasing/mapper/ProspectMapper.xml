@@ -19,14 +19,14 @@
 		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
 		<result column="phone_no" property="phoneNo" jdbcType="VARCHAR" />
 		<result column="email" property="email" jdbcType="VARCHAR" />
-		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="VARCHAR" />
+		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="INTEGER" />
 		<result column="fax_no" property="faxNo" jdbcType="VARCHAR" />
 		<result column="address" property="address" jdbcType="VARCHAR" />
-		<result column="source" property="source" jdbcType="VARCHAR" />
-		<result column="purpose" property="purpose" jdbcType="VARCHAR" />
+		<result column="source" property="source" jdbcType="INTEGER" />
+		<result column="purpose" property="purpose" jdbcType="INTEGER" />
 		<result column="commercial_need" property="commercialNeed" jdbcType="VARCHAR" />
 		<result column="document_notes" property="documentNotes" jdbcType="VARCHAR" />
-		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="INTEGER" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
 		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
 		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />

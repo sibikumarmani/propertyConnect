@@ -20,12 +20,12 @@ public class Prospect extends AuditModel {
 	public String mobileNo;
 	public String phoneNo;
 	public String email;
-	public String preferredContactMethod;
+	public Integer preferredContactMethod;
 	public String faxNo;
 	public String address;
-	public String source;
-	public String purpose;
+	public Integer source;
+	public Integer purpose;
 	public String commercialNeed;
 	public String documentNotes;
-	public String status;
+	public Integer status;
 }

@@ -12,9 +12,11 @@ public class Reservation extends AuditModel {
 	public Long prospectId;
 	public Long offerId;
 	public Long propertyId;
+	public Long blockId;
+	public Long floorId;
 	public Long unitId;
-	public String status;
-	public String approvalStatus;
+	public Integer status;
+	public Integer approvalStatus;
 	public BigDecimal reservationFee;
 	public BigDecimal paidAmount;
 	public Boolean paymentWaived;

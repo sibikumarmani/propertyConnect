@@ -9,8 +9,10 @@ public class Offer extends AuditModel {
 	public Long prospectId;
 	public Long propertyId;
 	public String propertyName;
-	public String requirementLevel;
+	public Integer requirementLevel;
+	public Long blockId;
 	public String blockName;
+	public Long floorId;
 	public String floorName;
 	public Long unitId;
 	public String offerNo;
@@ -18,6 +20,6 @@ public class Offer extends AuditModel {
 	public BigDecimal discountAmount;
 	public BigDecimal finalAmount;
 	public String specialTerms;
-	public String status;
+	public Integer status;
 	public Boolean approvalRequired;
 }

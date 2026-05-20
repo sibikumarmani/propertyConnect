@@ -21,12 +21,12 @@ public interface ReservationMapper {
 
 	public List<Reservation> listReservationsByProspect(Long prospectId);
 
-	public int updateReservationApproval(@Param("id") Long id, @Param("status") String status, @Param("approvalStatus") String approvalStatus,
+	public int updateReservationApproval(@Param("id") Long id, @Param("status") Integer status, @Param("approvalStatus") Integer approvalStatus,
 			@Param("updatedBy") Long updatedBy);
 
-	public int updateReservationStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);
+	public int updateReservationStatus(@Param("id") Long id, @Param("status") Integer status, @Param("updatedBy") Long updatedBy);
 
-	public int addReservationPayment(@Param("id") Long id, @Param("amount") BigDecimal amount, @Param("updatedBy") Long updatedBy);
+	public int addReservationPayment(@Param("id") Long id, @Param("amount") BigDecimal amount, @Param("status") Integer status, @Param("updatedBy") Long updatedBy);
 
-	public boolean hasActiveReservation(Long unitId);
+	public boolean hasActiveReservation(@Param("unitId") Long unitId, @Param("statuses") List<Integer> statuses);
 }

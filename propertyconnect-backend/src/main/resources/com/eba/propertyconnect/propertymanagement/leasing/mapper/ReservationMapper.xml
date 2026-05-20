@@ -9,9 +9,11 @@
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="offer_id" property="offerId" jdbcType="BIGINT" />
 		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="block_id" property="blockId" jdbcType="BIGINT" />
+		<result column="floor_id" property="floorId" jdbcType="BIGINT" />
 		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
-		<result column="status" property="status" jdbcType="VARCHAR" />
-		<result column="approval_status" property="approvalStatus" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="INTEGER" />
+		<result column="approval_status" property="approvalStatus" jdbcType="INTEGER" />
 		<result column="reservation_fee" property="reservationFee" jdbcType="DECIMAL" />
 		<result column="paid_amount" property="paidAmount" jdbcType="DECIMAL" />
 		<result column="payment_waived" property="paymentWaived" jdbcType="BIT" />
@@ -23,10 +25,10 @@
 	</resultMap>
 	<insert id="createReservation" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation">
 		INSERT INTO pa_txn_leasing_reservation (
-			company_id, reservation_no, lead_id, prospect_id, offer_id, property_id, unit_id, status, approval_status, reservation_fee, paid_amount, payment_waived, expires_at, created_by
+			company_id, reservation_no, lead_id, prospect_id, offer_id, property_id, block_id, floor_id, unit_id, status, approval_status, reservation_fee, paid_amount, payment_waived, expires_at, created_by
 		)
 		VALUES (
-			#{companyId}, #{reservationNo}, #{leadId}, #{prospectId}, #{offerId}, #{propertyId}, #{unitId}, #{status}, #{approvalStatus}, #{reservationFee}, #{paidAmount}, #{paymentWaived}, #{expiresAt}, #{createdBy}
+			#{companyId}, #{reservationNo}, #{leadId}, #{prospectId}, #{offerId}, #{propertyId}, #{blockId}, #{floorId}, #{unitId}, #{status}, #{approvalStatus}, #{reservationFee}, #{paidAmount}, #{paymentWaived}, #{expiresAt}, #{createdBy}
 		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
@@ -37,6 +39,8 @@
 			prospect_id = #{prospectId},
 			offer_id = #{offerId},
 			property_id = #{propertyId},
+			block_id = #{blockId},
+			floor_id = #{floorId},
 			unit_id = #{unitId},
 			status = #{status},
 			approval_status = #{approvalStatus},
@@ -58,10 +62,11 @@
 	</select>
 	<update id="updateReservationApproval">UPDATE pa_txn_leasing_reservation SET status = #{status}, approval_status = #{approvalStatus}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 	<update id="updateReservationStatus">UPDATE pa_txn_leasing_reservation SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
-	<update id="addReservationPayment">UPDATE pa_txn_leasing_reservation SET paid_amount = paid_amount + #{amount}, status = 'PAID', updated_by = #{updatedBy} WHERE id = #{id}</update>
-	<select id="hasActiveReservation" parameterType="long" resultType="boolean">
+	<update id="addReservationPayment">UPDATE pa_txn_leasing_reservation SET paid_amount = paid_amount + #{amount}, status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+	<select id="hasActiveReservation" resultType="boolean">
 		SELECT COUNT(*) > 0 FROM pa_txn_leasing_reservation
 		WHERE unit_id = #{unitId}
-		AND status IN ('PENDING_APPROVAL', 'PAYMENT_PENDING', 'PAID', 'CONFIRMED')
+		AND status IN
+		<foreach collection="statuses" item="status" open="(" separator="," close=")">#{status}</foreach>
 	</select>
 </mapper>

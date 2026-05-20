@@ -12,9 +12,9 @@
 		<result column="contact_person" property="contactPerson" jdbcType="VARCHAR" />
 		<result column="mobile_no" property="mobileNo" jdbcType="VARCHAR" />
 		<result column="email" property="email" jdbcType="VARCHAR" />
-		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="VARCHAR" />
-		<result column="purpose" property="purpose" jdbcType="VARCHAR" />
-		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="preferred_contact_method" property="preferredContactMethod" jdbcType="INTEGER" />
+		<result column="purpose" property="purpose" jdbcType="INTEGER" />
+		<result column="status" property="status" jdbcType="INTEGER" />
 		<result column="qualification_score" property="qualificationScore" jdbcType="INTEGER" />
 		<result column="qualification_notes" property="qualificationNotes" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
@@ -56,6 +56,6 @@
 			updated_by = #{updatedBy}
 		WHERE id = #{id}
 	</update>
-	<update id="qualifyLead">UPDATE pa_txn_leasing_lead SET status = 'QUALIFIED', qualification_score = #{score}, qualification_notes = #{notes}, updated_by = #{updatedBy} WHERE id = #{id}</update>
+	<update id="qualifyLead">UPDATE pa_txn_leasing_lead SET status = #{status}, qualification_score = #{score}, qualification_notes = #{notes}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 	<update id="updateLeadStatus">UPDATE pa_txn_leasing_lead SET status = #{status}, updated_by = #{updatedBy} WHERE id = #{id}</update>
 </mapper>

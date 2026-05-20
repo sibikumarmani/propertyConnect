@@ -39,6 +39,9 @@ import com.eba.propertyconnect.propertymanagement.leasing.mapper.ReservationMapp
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.SiteVisitMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.StatusHistoryMapper;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.UnitMapper;
+import com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord;
+import com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster;
+import com.eba.propertyconnect.propertymanagement.property.mapper.PropertyMapper;
 import com.eba.propertyconnect.propertymanagement.integration.coreconnect.client.CoreConnectAuthSoapClient;
 import com.eba.propertyconnect.propertymanagement.util.CacheHelper;
 import com.google.gson.JsonArray;
@@ -53,6 +56,13 @@ public class LeasingService {
 
 	private static final String LEASING_CACHE_SCOPE = "leasing";
 	private static final String FIRM_TYPE_CODE_TYPE = "cf_firm_type";
+	private static final String LEAD_STATUS_CODE_TYPE = "oc_lead_status";
+	private static final String PROSPECT_STATUS_CODE_TYPE = "oc_prospect_status";
+	private static final String REQUIREMENT_LEVEL_CODE_TYPE = "pa_requirement_level";
+	private static final String SITE_VISIT_STATUS_CODE_TYPE = "pa_site_visit_status";
+	private static final String OFFER_STATUS_CODE_TYPE = "pa_offer_status";
+	private static final String RESERVATION_STATUS_CODE_TYPE = "pa_reservation_status";
+	private static final String DECISION_CODE_TYPE = "cf_decision";
 
 	@Inject
 	private LeadMapper leadMapper;
@@ -74,6 +84,9 @@ public class LeasingService {
 
 	@Inject
 	private SiteVisitMapper siteVisitMapper;
+
+	@Inject
+	private PropertyMapper propertyMapper;
 
 	@Inject
 	private OfferMapper offerMapper;
@@ -121,9 +134,9 @@ public class LeasingService {
 		applyBusinessParty(request);
 		Lead lead = request;
 		lead.leadNo = defaultString(lead.leadNo, nextNumber("LD"));
-		lead.status = defaultString(lead.status, "NEW");
+		lead.status = firstInteger(lead.status, requireLeadStatusId("NEW", lead.companyId));
 		leadMapper.createLead(lead);
-		statusHistoryMapper.insertHistory("LEAD", lead.id, null, lead.status, "Lead created", lead.createdBy);
+		statusHistoryMapper.insertHistory("LEAD", lead.id, null, leadStatusName(lead.status, lead.companyId), "Lead created", lead.createdBy);
 		clearLeasingCache();
 		return leadMapper.getLead(lead.id);
 	}
@@ -152,8 +165,9 @@ public class LeasingService {
 		if (lead == null) {
 			throw new IllegalArgumentException("Lead not found");
 		}
-		leadMapper.qualifyLead(leadId, request.score, request.notes, request.updatedBy);
-		statusHistoryMapper.insertHistory("LEAD", leadId, lead.status, "QUALIFIED", "Lead qualified", request.updatedBy);
+		Integer qualifiedStatus = requireLeadStatusId("QUALIFIED", lead.companyId);
+		leadMapper.qualifyLead(leadId, qualifiedStatus, request.score, request.notes, request.updatedBy);
+		statusHistoryMapper.insertHistory("LEAD", leadId, leadStatusName(lead.status, lead.companyId), "QUALIFIED", "Lead qualified", request.updatedBy);
 		clearLeasingCache();
 		return leadMapper.getLead(leadId);
 	}
@@ -169,7 +183,8 @@ public class LeasingService {
 		if (lead == null) {
 			throw new IllegalArgumentException("Lead not found");
 		}
-		if (!"QUALIFIED".equals(lead.status) && !"CONVERTED_TO_PROSPECT".equals(lead.status)) {
+		String leadStatus = leadStatusName(lead.status, lead.companyId);
+		if (!"QUALIFIED".equals(leadStatus) && !"CONVERTED_TO_PROSPECT".equals(leadStatus)) {
 			throw new IllegalArgumentException("Only qualified leads can be converted to prospects");
 		}
 		Prospect prospect = ensureProspectForLead(leadId, createdBy, true, request);
@@ -214,19 +229,19 @@ public class LeasingService {
 		prospect.mobileNo = firstText(request == null ? null : request.mobileNo, lead.mobileNo);
 		prospect.phoneNo = firstText(request == null ? null : request.phoneNo, businessParty == null ? null : businessParty.contactNumber);
 		prospect.email = firstText(request == null ? null : request.email, lead.email);
-		prospect.preferredContactMethod = firstText(request == null ? null : request.preferredContactMethod, lead.preferredContactMethod);
+		prospect.preferredContactMethod = firstInteger(request == null ? null : request.preferredContactMethod, lead.preferredContactMethod);
 		prospect.faxNo = request == null ? null : request.faxNo;
 		prospect.address = firstText(request == null ? null : request.address, businessParty == null ? null : businessParty.addressLine);
 		prospect.source = request == null ? null : request.source;
-		prospect.purpose = firstText(request == null ? null : request.purpose, lead.purpose);
+		prospect.purpose = firstInteger(request == null ? null : request.purpose, lead.purpose);
 		prospect.commercialNeed = request == null ? null : request.commercialNeed;
 		prospect.documentNotes = request == null ? null : request.documentNotes;
-		prospect.status = "PROSPECT";
+		prospect.status = requireProspectStatusId("PROSPECT", prospect.companyId);
 		prospect.createdBy = createdBy;
 		prospectMapper.createProspect(prospect);
 		if (markLeadConverted) {
-			leadMapper.updateLeadStatus(leadId, "CONVERTED_TO_PROSPECT", createdBy);
-			statusHistoryMapper.insertHistory("LEAD", leadId, lead.status, "CONVERTED_TO_PROSPECT", "Converted to prospect", createdBy);
+			leadMapper.updateLeadStatus(leadId, requireLeadStatusId("CONVERTED_TO_PROSPECT", lead.companyId), createdBy);
+			statusHistoryMapper.insertHistory("LEAD", leadId, leadStatusName(lead.status, lead.companyId), "CONVERTED_TO_PROSPECT", "Converted to prospect", createdBy);
 		}
 		statusHistoryMapper.insertHistory("PROSPECT", prospect.id, null, "PROSPECT", "Prospect created", createdBy);
 		return prospectMapper.getProspect(prospect.id);
@@ -346,11 +361,13 @@ public class LeasingService {
 			throw new IllegalArgumentException("Visit date and time is required");
 		}
 		SiteVisit visit = request;
-		validateSiteVisitLocation(visit, null);
 		visit.companyId = prospect.companyId;
-		visit.status = defaultString(visit.status, "SCHEDULED");
+		visit.status = visit.status == null ? requireSiteVisitStatusId("SCHEDULED", visit.companyId) : visit.status;
+		requireSiteVisitStatusValue(visit.status, visit.companyId);
+		validateSiteVisitLocation(visit, null);
 		siteVisitMapper.createSiteVisit(visit);
 		updateProspectStage(prospect, "SITE_VISIT_SCHEDULED", "Site visit scheduled", visit.createdBy);
+		statusHistoryMapper.insertHistory("SITE_VISIT", visit.id, null, siteVisitStatusName(visit.status, visit.companyId), "Site visit scheduled", visit.createdBy);
 		clearLeasingCache();
 		return siteVisitMapper.getSiteVisit(visit.id);
 	}
@@ -361,16 +378,45 @@ public class LeasingService {
 	}
 
 	private void validateSiteVisitLocation(SiteVisit visit, Long existingUnitId) {
-		visit.requirementLevel = defaultString(visit.requirementLevel, "PROPERTY");
+		String requirementLevel = requirementLevelName(visit.requirementLevel, visit.companyId);
+		if (!hasText(requirementLevel)) {
+			requirementLevel = "PROPERTY";
+		}
 		requireId(visit.propertyId, "Property is required");
-		if ("BLOCK".equals(visit.requirementLevel) || "FLOOR".equals(visit.requirementLevel) || "UNIT".equals(visit.requirementLevel)) {
-			requireText(visit.blockName, "Block / building is required");
+		PropertyMaster property = propertyMapper.getProperty(visit.propertyId);
+		if (property == null) {
+			throw new IllegalArgumentException("Property not found");
 		}
-		if ("FLOOR".equals(visit.requirementLevel) || "UNIT".equals(visit.requirementLevel)) {
-			requireText(visit.floorName, "Floor is required");
+		visit.propertyName = firstText(visit.propertyName, property.name);
+		if ("BLOCK".equals(requirementLevel) || "FLOOR".equals(requirementLevel) || "UNIT".equals(requirementLevel)) {
+			requireId(visit.blockId, "Block / building is required");
+			MasterRecord block = propertyMapper.listBlocks(visit.propertyId).stream()
+					.filter(item -> visit.blockId.equals(item.id))
+					.findFirst()
+					.orElseThrow(() -> new IllegalArgumentException("Block does not belong to selected property"));
+			visit.blockName = block.name;
 		}
-		if ("UNIT".equals(visit.requirementLevel)) {
+		else {
+			visit.blockId = null;
+			visit.blockName = null;
+		}
+		if ("FLOOR".equals(requirementLevel) || "UNIT".equals(requirementLevel)) {
+			requireId(visit.floorId, "Floor is required");
+			MasterRecord floor = propertyMapper.listFloors(visit.blockId).stream()
+					.filter(item -> visit.floorId.equals(item.id))
+					.findFirst()
+					.orElseThrow(() -> new IllegalArgumentException("Floor does not belong to selected block"));
+			visit.floorName = floor.name;
+		}
+		else {
+			visit.floorId = null;
+			visit.floorName = null;
+		}
+		if ("UNIT".equals(requirementLevel)) {
 			requireId(visit.unitId, "Unit is required");
+		}
+		else {
+			visit.unitId = null;
 		}
 		if (visit.unitId == null) {
 			return;
@@ -381,6 +427,9 @@ public class LeasingService {
 		}
 		if (unit.propertyId != null && !unit.propertyId.equals(visit.propertyId)) {
 			throw new IllegalArgumentException("Unit does not belong to selected property");
+		}
+		if (visit.floorId != null && propertyMapper.listUnits(visit.floorId).stream().noneMatch(item -> visit.unitId.equals(item.id))) {
+			throw new IllegalArgumentException("Unit does not belong to selected floor");
 		}
 		if (!visit.unitId.equals(existingUnitId) && !"AVAILABLE".equals(unit.status)) {
 			throw new IllegalArgumentException("Only available units can be selected for a site visit");
@@ -406,12 +455,16 @@ public class LeasingService {
 			throw new IllegalArgumentException("Prospect not found");
 		}
 		SiteVisit visit = request;
-		validateSiteVisitLocation(visit, existingVisit.unitId);
 		visit.id = siteVisitId;
 		visit.companyId = prospect.companyId;
-		visit.status = defaultString(visit.status, existingVisit.status);
+		visit.status = firstInteger(visit.status, existingVisit.status);
+		requireSiteVisitStatusValue(visit.status, visit.companyId);
+		validateSiteVisitLocation(visit, existingVisit.unitId);
 		siteVisitMapper.updateSiteVisit(visit);
 		updateProspectStage(prospect, "SITE_VISIT_SCHEDULED", "Site visit updated", visit.updatedBy);
+		if (existingVisit.status == null || !existingVisit.status.equals(visit.status)) {
+			statusHistoryMapper.insertHistory("SITE_VISIT", siteVisitId, siteVisitStatusName(existingVisit.status, existingVisit.companyId), siteVisitStatusName(visit.status, visit.companyId), "Site visit status updated", visit.updatedBy);
+		}
 		clearLeasingCache();
 		return siteVisitMapper.getSiteVisit(siteVisitId);
 	}
@@ -424,21 +477,22 @@ public class LeasingService {
 		BigDecimal discount = request.discountAmount == null ? BigDecimal.ZERO : request.discountAmount;
 		request.finalAmount = request.finalAmount == null ? request.baseAmount.subtract(discount) : request.finalAmount;
 		request.approvalRequired = discount.signum() > 0 || hasText(request.specialTerms);
-		request.status = defaultString(request.status, "DRAFT");
-		if (!"DRAFT".equals(request.status) && !"PENDING_APPROVAL".equals(request.status)) {
-			throw new IllegalArgumentException("Offer must be saved as draft or submitted for approval");
-		}
 		Prospect prospect = prospectMapper.getProspect(request.prospectId);
 		if (prospect == null) {
 			throw new IllegalArgumentException("Prospect not found");
 		}
 		Offer offer = request;
-		validateOfferLocation(offer);
 		offer.companyId = prospect.companyId;
+		offer.status = firstInteger(offer.status, requireOfferStatusId("DRAFT", offer.companyId));
+		String requestStatus = offerStatusName(offer.status, offer.companyId);
+		if (!"DRAFT".equals(requestStatus) && !"PENDING_APPROVAL".equals(requestStatus)) {
+			throw new IllegalArgumentException("Offer must be saved as draft or submitted for approval");
+		}
+		validateOfferLocation(offer);
 		offer.offerNo = defaultString(offer.offerNo, nextNumber("OF"));
 		offerMapper.createOffer(offer);
 		updateProspectStage(prospect, "OFFER_IN_PROGRESS", "Offer created", offer.createdBy);
-		statusHistoryMapper.insertHistory("OFFER", offer.id, null, offer.status, "Offer created", offer.createdBy);
+		statusHistoryMapper.insertHistory("OFFER", offer.id, null, requestStatus, "Offer created", offer.createdBy);
 		clearLeasingCache();
 		return offerMapper.getOffer(offer.id);
 	}
@@ -451,12 +505,13 @@ public class LeasingService {
 		if (offer == null) {
 			throw new IllegalArgumentException("Offer not found");
 		}
-		if (!"PENDING_APPROVAL".equals(offer.status)) {
+		String currentStatus = offerStatusName(offer.status, offer.companyId);
+		if (!"PENDING_APPROVAL".equals(currentStatus)) {
 			throw new IllegalArgumentException("Offer is not pending approval");
 		}
 		String nextStatus = request.approved ? "APPROVED" : "REJECTED";
-		offerMapper.updateOfferStatus(offerId, nextStatus, request.approvedBy);
-		statusHistoryMapper.insertHistory("OFFER", offerId, offer.status, nextStatus, request.comments, request.approvedBy);
+		offerMapper.updateOfferStatus(offerId, requireOfferStatusId(nextStatus, offer.companyId), request.approvedBy);
+		statusHistoryMapper.insertHistory("OFFER", offerId, currentStatus, nextStatus, request.comments, request.approvedBy);
 		clearLeasingCache();
 		return offerMapper.getOffer(offerId);
 	}
@@ -467,16 +522,45 @@ public class LeasingService {
 	}
 
 	private void validateOfferLocation(Offer offer) {
-		offer.requirementLevel = defaultString(offer.requirementLevel, "PROPERTY");
+		String requirementLevel = requirementLevelName(offer.requirementLevel, offer.companyId);
+		if (!hasText(requirementLevel)) {
+			requirementLevel = "PROPERTY";
+		}
 		requireId(offer.propertyId, "Property is required");
-		if ("BLOCK".equals(offer.requirementLevel) || "FLOOR".equals(offer.requirementLevel) || "UNIT".equals(offer.requirementLevel)) {
-			requireText(offer.blockName, "Block / building is required");
+		PropertyMaster property = propertyMapper.getProperty(offer.propertyId);
+		if (property == null) {
+			throw new IllegalArgumentException("Property not found");
 		}
-		if ("FLOOR".equals(offer.requirementLevel) || "UNIT".equals(offer.requirementLevel)) {
-			requireText(offer.floorName, "Floor is required");
+		offer.propertyName = firstText(offer.propertyName, property.name);
+		if ("BLOCK".equals(requirementLevel) || "FLOOR".equals(requirementLevel) || "UNIT".equals(requirementLevel)) {
+			requireId(offer.blockId, "Block / building is required");
+			MasterRecord block = propertyMapper.listBlocks(offer.propertyId).stream()
+					.filter(item -> offer.blockId.equals(item.id))
+					.findFirst()
+					.orElseThrow(() -> new IllegalArgumentException("Block does not belong to selected property"));
+			offer.blockName = block.name;
 		}
-		if ("UNIT".equals(offer.requirementLevel)) {
+		else {
+			offer.blockId = null;
+			offer.blockName = null;
+		}
+		if ("FLOOR".equals(requirementLevel) || "UNIT".equals(requirementLevel)) {
+			requireId(offer.floorId, "Floor is required");
+			MasterRecord floor = propertyMapper.listFloors(offer.blockId).stream()
+					.filter(item -> offer.floorId.equals(item.id))
+					.findFirst()
+					.orElseThrow(() -> new IllegalArgumentException("Floor does not belong to selected block"));
+			offer.floorName = floor.name;
+		}
+		else {
+			offer.floorId = null;
+			offer.floorName = null;
+		}
+		if ("UNIT".equals(requirementLevel)) {
 			requireId(offer.unitId, "Unit is required");
+		}
+		else {
+			offer.unitId = null;
 		}
 		if (offer.unitId == null) {
 			return;
@@ -487,6 +571,9 @@ public class LeasingService {
 		}
 		if (unit.propertyId != null && !unit.propertyId.equals(offer.propertyId)) {
 			throw new IllegalArgumentException("Unit does not belong to selected property");
+		}
+		if (offer.floorId != null && propertyMapper.listUnits(offer.floorId).stream().noneMatch(item -> offer.unitId.equals(item.id))) {
+			throw new IllegalArgumentException("Unit does not belong to selected floor");
 		}
 		offer.propertyName = firstText(offer.propertyName, unit.propertyName);
 	}
@@ -501,7 +588,8 @@ public class LeasingService {
 		if (existingOffer == null) {
 			throw new IllegalArgumentException("Offer not found");
 		}
-		if (!"DRAFT".equals(existingOffer.status)) {
+		String existingStatus = offerStatusName(existingOffer.status, existingOffer.companyId);
+		if (!"DRAFT".equals(existingStatus)) {
 			throw new IllegalArgumentException("Only draft offers can be edited");
 		}
 		if (!request.prospectId.equals(existingOffer.prospectId)) {
@@ -516,16 +604,17 @@ public class LeasingService {
 		request.finalAmount = request.finalAmount == null ? request.baseAmount.subtract(discount) : request.finalAmount;
 		request.approvalRequired = discount.signum() > 0 || hasText(request.specialTerms);
 		Offer offer = request;
-		validateOfferLocation(offer);
 		offer.id = offerId;
 		offer.companyId = prospect.companyId;
-		offer.status = defaultString(offer.status, existingOffer.status);
-		if (!"DRAFT".equals(offer.status) && !"PENDING_APPROVAL".equals(offer.status)) {
+		offer.status = firstInteger(offer.status, existingOffer.status);
+		validateOfferLocation(offer);
+		String nextOfferStatus = offerStatusName(offer.status, prospect.companyId);
+		if (!"DRAFT".equals(nextOfferStatus) && !"PENDING_APPROVAL".equals(nextOfferStatus)) {
 			throw new IllegalArgumentException("Offer must be saved as draft or submitted for approval");
 		}
 		offerMapper.updateOffer(offer);
 		updateProspectStage(prospect, "OFFER_IN_PROGRESS", "Offer updated", offer.updatedBy);
-		statusHistoryMapper.insertHistory("OFFER", offer.id, existingOffer.status, offer.status, "Offer updated", offer.updatedBy);
+		statusHistoryMapper.insertHistory("OFFER", offer.id, existingStatus, nextOfferStatus, "Offer updated", offer.updatedBy);
 		clearLeasingCache();
 		return offerMapper.getOffer(offer.id);
 	}
@@ -538,12 +627,13 @@ public class LeasingService {
 		if (offer == null) {
 			throw new IllegalArgumentException("Offer not found");
 		}
-		String nextStatus = request.status.trim().toUpperCase();
-		if (!isAllowedOfferTransition(offer.status, nextStatus)) {
-			throw new IllegalArgumentException("Offer cannot be moved from " + offer.status + " to " + nextStatus);
+		String currentStatus = offerStatusName(offer.status, offer.companyId);
+		String nextStatus = normalizeStatus(request.status);
+		if (!isAllowedOfferTransition(currentStatus, nextStatus)) {
+			throw new IllegalArgumentException("Offer cannot be moved from " + currentStatus + " to " + nextStatus);
 		}
-		offerMapper.updateOfferStatus(offerId, nextStatus, request.updatedBy);
-		statusHistoryMapper.insertHistory("OFFER", offerId, offer.status, nextStatus, request.comments, request.updatedBy);
+		offerMapper.updateOfferStatus(offerId, requireOfferStatusId(nextStatus, offer.companyId), request.updatedBy);
+		statusHistoryMapper.insertHistory("OFFER", offerId, currentStatus, nextStatus, request.comments, request.updatedBy);
 		clearLeasingCache();
 		return offerMapper.getOffer(offerId);
 	}
@@ -558,17 +648,18 @@ public class LeasingService {
 		if (offer == null) {
 			throw new IllegalArgumentException("Offer not found");
 		}
-		if (!"SENT".equals(offer.status) && !"NEGOTIATION".equals(offer.status)) {
+		String offerStatus = offerStatusName(offer.status, offer.companyId);
+		if (!"SENT".equals(offerStatus) && !"NEGOTIATION".equals(offerStatus)) {
 			throw new IllegalArgumentException("Only sent offers can be negotiated");
 		}
 		Negotiation negotiation = request;
 		negotiation.companyId = offer.companyId;
 		negotiation.status = defaultString(negotiation.status, "OPEN");
 		negotiationMapper.createNegotiation(negotiation);
-		offerMapper.updateOfferStatus(negotiation.offerId, "NEGOTIATION", negotiation.createdBy);
+		offerMapper.updateOfferStatus(negotiation.offerId, requireOfferStatusId("NEGOTIATION", offer.companyId), negotiation.createdBy);
 		Prospect prospect = prospectMapper.getProspect(offer.prospectId);
 		updateProspectStage(prospect, "NEGOTIATION_IN_PROGRESS", "Negotiation recorded", negotiation.createdBy);
-		statusHistoryMapper.insertHistory("OFFER", negotiation.offerId, offer.status, "NEGOTIATION", "Negotiation recorded", negotiation.createdBy);
+		statusHistoryMapper.insertHistory("OFFER", negotiation.offerId, offerStatus, "NEGOTIATION", "Negotiation recorded", negotiation.createdBy);
 		clearLeasingCache();
 		return negotiationMapper.getNegotiation(negotiation.id);
 	}
@@ -588,7 +679,7 @@ public class LeasingService {
 		reservation.paidAmount = BigDecimal.ZERO;
 		reservationMapper.createReservation(reservation);
 		updateProspectStage(prospect, "RESERVATION_IN_PROGRESS", "Reservation requested", reservation.createdBy);
-		statusHistoryMapper.insertHistory("RESERVATION", reservation.id, null, reservation.status, "Reservation requested", reservation.createdBy);
+		statusHistoryMapper.insertHistory("RESERVATION", reservation.id, null, reservationStatusName(reservation.status, reservation.companyId), "Reservation requested", reservation.createdBy);
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservation.id);
 	}
@@ -599,7 +690,8 @@ public class LeasingService {
 		if (existingReservation == null) {
 			throw new IllegalArgumentException("Reservation not found");
 		}
-		if (!"DRAFT".equals(existingReservation.status)) {
+		String existingStatus = reservationStatusName(existingReservation.status, existingReservation.companyId);
+		if (!"DRAFT".equals(existingStatus)) {
 			throw new IllegalArgumentException("Only draft reservations can be edited");
 		}
 		Reservation reservation = request;
@@ -608,7 +700,7 @@ public class LeasingService {
 		reservation.paidAmount = existingReservation.paidAmount;
 		reservationMapper.updateReservation(reservation);
 		updateProspectStage(prospect, "RESERVATION_IN_PROGRESS", "Reservation updated", reservation.updatedBy);
-		statusHistoryMapper.insertHistory("RESERVATION", reservation.id, existingReservation.status, reservation.status, "Reservation updated", reservation.updatedBy);
+		statusHistoryMapper.insertHistory("RESERVATION", reservation.id, existingStatus, reservationStatusName(reservation.status, reservation.companyId), "Reservation updated", reservation.updatedBy);
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservation.id);
 	}
@@ -623,7 +715,7 @@ public class LeasingService {
 		if (!reservation.prospectId.equals(offer.prospectId)) {
 			throw new IllegalArgumentException("Offer does not belong to selected prospect");
 		}
-		if (!"ACCEPTED".equals(offer.status)) {
+		if (!"ACCEPTED".equals(offerStatusName(offer.status, offer.companyId))) {
 			throw new IllegalArgumentException("Only accepted offers can be reserved");
 		}
 		Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
@@ -639,7 +731,8 @@ public class LeasingService {
 			if (!"AVAILABLE".equals(unit.status)) {
 				throw new IllegalArgumentException("Selected unit is not available");
 			}
-			if (reservationMapper.hasActiveReservation(unit.id)) {
+			List<Integer> activeStatuses = reservationStatusIds(List.of("PENDING_APPROVAL", "PAYMENT_PENDING", "PAID", "CONFIRMED"), prospect.companyId);
+			if (!activeStatuses.isEmpty() && reservationMapper.hasActiveReservation(unit.id, activeStatuses)) {
 				throw new IllegalArgumentException("Selected unit already has an active reservation");
 			}
 		}
@@ -648,12 +741,16 @@ public class LeasingService {
 		reservation.companyId = prospect.companyId;
 		reservation.leadId = prospect.leadId;
 		reservation.propertyId = unit == null ? offer.propertyId : unit.propertyId;
+		reservation.blockId = offer.blockId;
+		reservation.floorId = offer.floorId;
 		reservation.unitId = unit == null ? null : unit.id;
-		reservation.status = defaultString(reservation.status, "DRAFT");
-		if (!"DRAFT".equals(reservation.status) && !"PENDING_APPROVAL".equals(reservation.status)) {
-			throw new IllegalArgumentException("Reservation must be saved as draft or submitted for approval");
+		String requestStatus = reservationStatusName(reservation.status, prospect.companyId);
+		requestStatus = defaultString(requestStatus, "DRAFT");
+		if (!"DRAFT".equals(requestStatus) && !"PENDING_APPROVAL".equals(requestStatus)) {
+			throw new IllegalArgumentException("Reservation must be saved as draft or submitted");
 		}
-		reservation.approvalStatus = "PENDING_APPROVAL".equals(reservation.status) ? "PENDING" : "NOT_REQUIRED";
+		reservation.status = requireReservationStatusId(requestStatus, prospect.companyId);
+		reservation.approvalStatus = requireDecisionId("PENDING_APPROVAL".equals(requestStatus) ? "SUBMITTED" : "NOT_REQUIRED", prospect.companyId);
 		return prospect;
 	}
 
@@ -667,13 +764,14 @@ public class LeasingService {
 			throw new IllegalArgumentException("Approval decision is required");
 		}
 		Reservation reservation = reservationMapper.getReservation(reservationId);
-		if (!"PENDING_APPROVAL".equals(reservation.status)) {
-			throw new IllegalArgumentException("Reservation is not pending approval");
+		String currentStatus = reservationStatusName(reservation.status, reservation.companyId);
+		if (!"PENDING_APPROVAL".equals(currentStatus)) {
+			throw new IllegalArgumentException("Reservation is not submitted");
 		}
 		String nextStatus = request.approved ? (Boolean.TRUE.equals(reservation.paymentWaived) ? "PAID" : "PAYMENT_PENDING") : "REJECTED";
 		String nextApprovalStatus = request.approved ? "APPROVED" : "REJECTED";
-		reservationMapper.updateReservationApproval(reservationId, nextStatus, nextApprovalStatus, request.approvedBy);
-		statusHistoryMapper.insertHistory("RESERVATION", reservationId, reservation.status, nextStatus, request.comments, request.approvedBy);
+		reservationMapper.updateReservationApproval(reservationId, requireReservationStatusId(nextStatus, reservation.companyId), requireDecisionId(nextApprovalStatus, reservation.companyId), request.approvedBy);
+		statusHistoryMapper.insertHistory("RESERVATION", reservationId, currentStatus, nextStatus, request.comments, request.approvedBy);
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservationId);
 	}
@@ -687,12 +785,13 @@ public class LeasingService {
 			throw new IllegalArgumentException("Reservation not found");
 		}
 		String nextStatus = request.status.trim().toUpperCase();
-		if (!isAllowedReservationTransition(reservation.status, nextStatus)) {
-			throw new IllegalArgumentException("Reservation cannot be moved from " + reservation.status + " to " + nextStatus);
+		String currentStatus = reservationStatusName(reservation.status, reservation.companyId);
+		if (!isAllowedReservationTransition(currentStatus, nextStatus)) {
+			throw new IllegalArgumentException("Reservation cannot be moved from " + currentStatus + " to " + nextStatus);
 		}
-		String nextApprovalStatus = "PENDING_APPROVAL".equals(nextStatus) ? "PENDING" : reservation.approvalStatus;
-		reservationMapper.updateReservationApproval(reservationId, nextStatus, nextApprovalStatus, request.updatedBy);
-		statusHistoryMapper.insertHistory("RESERVATION", reservationId, reservation.status, nextStatus, request.comments, request.updatedBy);
+		Integer nextApprovalStatus = "PENDING_APPROVAL".equals(nextStatus) ? requireDecisionId("SUBMITTED", reservation.companyId) : reservation.approvalStatus;
+		reservationMapper.updateReservationApproval(reservationId, requireReservationStatusId(nextStatus, reservation.companyId), nextApprovalStatus, request.updatedBy);
+		statusHistoryMapper.insertHistory("RESERVATION", reservationId, currentStatus, nextStatus, request.comments, request.updatedBy);
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservationId);
 	}
@@ -705,15 +804,16 @@ public class LeasingService {
 		}
 		requireText(request.paymentMethod, "Payment method is required");
 		Reservation reservation = reservationMapper.getReservation(request.reservationId);
-		if (!"PAYMENT_PENDING".equals(reservation.status)) {
+		String currentStatus = reservationStatusName(reservation.status, reservation.companyId);
+		if (!"PAYMENT_PENDING".equals(currentStatus)) {
 			throw new IllegalArgumentException("Reservation is not ready for payment");
 		}
 		PaymentReceipt receipt = request;
 		receipt.receiptNo = defaultString(receipt.receiptNo, nextNumber("RC"));
 		receipt.paidAt = receipt.paidAt == null ? new Date() : receipt.paidAt;
 		paymentReceiptMapper.createPaymentReceipt(receipt);
-		reservationMapper.addReservationPayment(receipt.reservationId, receipt.amount, receipt.createdBy);
-		statusHistoryMapper.insertHistory("RESERVATION", receipt.reservationId, reservation.status, "PAID", "Reservation fee receipt recorded", receipt.createdBy);
+		reservationMapper.addReservationPayment(receipt.reservationId, receipt.amount, requireReservationStatusId("PAID", reservation.companyId), receipt.createdBy);
+		statusHistoryMapper.insertHistory("RESERVATION", receipt.reservationId, currentStatus, "PAID", "Reservation fee receipt recorded", receipt.createdBy);
 		clearLeasingCache();
 		return paymentReceiptMapper.getPaymentReceipt(receipt.id);
 	}
@@ -721,10 +821,12 @@ public class LeasingService {
 	@Transactional(rollbackFor = Exception.class)
 	public Reservation confirmReservation(Long reservationId, Long updatedBy) {
 		Reservation reservation = reservationMapper.getReservation(reservationId);
-		if (!"PAID".equals(reservation.status)) {
+		String currentStatus = reservationStatusName(reservation.status, reservation.companyId);
+		if (!"PAID".equals(currentStatus)) {
 			throw new IllegalArgumentException("Reservation must be paid before confirmation");
 		}
-		boolean approved = "APPROVED".equals(reservation.approvalStatus) || "NOT_REQUIRED".equals(reservation.approvalStatus);
+		String approvalStatus = decisionName(reservation.approvalStatus, reservation.companyId);
+		boolean approved = "APPROVED".equals(approvalStatus) || "NOT_REQUIRED".equals(approvalStatus);
 		boolean paidOrWaived = Boolean.TRUE.equals(reservation.paymentWaived)
 				|| (reservation.paidAmount != null && reservation.reservationFee != null && reservation.paidAmount.compareTo(reservation.reservationFee) >= 0);
 		// Business rule: reservation cannot be confirmed unless approved and paid or payment is waived.
@@ -735,13 +837,13 @@ public class LeasingService {
 			throw new IllegalArgumentException("Reservation fee must be paid or waived before confirmation");
 		}
 		// Business rule: confirmed reservations set unit status to RESERVED in the mapper transaction.
-		reservationMapper.updateReservationStatus(reservationId, "CONFIRMED", updatedBy);
+		reservationMapper.updateReservationStatus(reservationId, requireReservationStatusId("CONFIRMED", reservation.companyId), updatedBy);
 		if (reservation.unitId != null) {
 			unitMapper.updateUnitStatus(reservation.unitId, "RESERVED", updatedBy);
 		}
 		Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
 		updateProspectStage(prospect, "RESERVATION_IN_PROGRESS", "Reservation confirmed", updatedBy);
-		statusHistoryMapper.insertHistory("RESERVATION", reservationId, reservation.status, "CONFIRMED", "Reservation confirmed", updatedBy);
+		statusHistoryMapper.insertHistory("RESERVATION", reservationId, currentStatus, "CONFIRMED", "Reservation confirmed", updatedBy);
 		if (reservation.unitId != null) {
 			statusHistoryMapper.insertHistory("UNIT", reservation.unitId, null, "RESERVED", "Unit reserved", updatedBy);
 		}
@@ -764,7 +866,7 @@ public class LeasingService {
 	@Transactional(rollbackFor = Exception.class)
 	public Reservation moveToLease(Long reservationId, Long updatedBy) {
 		Reservation reservation = reservationMapper.getReservation(reservationId);
-		if (!"CONFIRMED".equals(reservation.status)) {
+		if (!"CONFIRMED".equals(reservationStatusName(reservation.status, reservation.companyId))) {
 			throw new IllegalArgumentException("Only confirmed reservations can move to lease or contract");
 		}
 		return changeReservationStatus(reservationId, "MOVED_TO_LEASE", updatedBy);
@@ -781,13 +883,297 @@ public class LeasingService {
 		return getCompanyCache(CacheHelper.GET_LEASING_REPORT_SUMMARY, () -> {
 			ReportSummary summary = new ReportSummary();
 			summary.leads = statusHistoryMapper.count("pa_txn_leasing_lead", null);
-			summary.qualifiedLeads = statusHistoryMapper.count("pa_txn_leasing_lead", "status = 'QUALIFIED'");
+			Integer qualifiedStatus = leadStatusId("QUALIFIED", null);
+			summary.qualifiedLeads = qualifiedStatus == null ? 0 : statusHistoryMapper.count("pa_txn_leasing_lead", "status = " + qualifiedStatus);
 			summary.prospects = statusHistoryMapper.count("pa_txn_leasing_prospect", null);
-			summary.activeReservations = statusHistoryMapper.count("pa_txn_leasing_reservation", "status IN ('DRAFT', 'PENDING_APPROVAL', 'PAYMENT_PENDING', 'PAID')");
-			summary.confirmedReservations = statusHistoryMapper.count("pa_txn_leasing_reservation", "status = 'CONFIRMED'");
+			List<Integer> activeReservationStatuses = reservationStatusIds(List.of("DRAFT", "PENDING_APPROVAL", "PAYMENT_PENDING", "PAID"), null);
+			Integer confirmedReservationStatus = reservationStatusId("CONFIRMED", null);
+			summary.activeReservations = activeReservationStatuses.isEmpty() ? 0 : statusHistoryMapper.count("pa_txn_leasing_reservation", "status IN (" + joinIntegers(activeReservationStatuses) + ")");
+			summary.confirmedReservations = confirmedReservationStatus == null ? 0 : statusHistoryMapper.count("pa_txn_leasing_reservation", "status = " + confirmedReservationStatus);
 			summary.latestHistory = statusHistoryMapper.latestHistory();
 			return summary;
 		});
+	}
+
+	private Integer leadStatusId(String status, Long companyId) {
+		if (!hasText(status)) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(LEAD_STATUS_CODE_TYPE, null, companyId)) {
+				if (matchesCodeValue(codeValue, status)) {
+					return codeValue.id == null ? null : codeValue.id.intValue();
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer requireLeadStatusId(String status, Long companyId) {
+		Integer statusId = leadStatusId(status, companyId);
+		if (statusId == null) {
+			throw new IllegalArgumentException("Lead status code value not found for " + status);
+		}
+		return statusId;
+	}
+
+	private String leadStatusName(Integer statusId, Long companyId) {
+		return codeValueName(LEAD_STATUS_CODE_TYPE, statusId, companyId);
+	}
+
+	private Integer prospectStatusId(String status, Long companyId) {
+		if (!hasText(status)) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(PROSPECT_STATUS_CODE_TYPE, null, companyId)) {
+				if (matchesCodeValue(codeValue, status)) {
+					return codeValue.id == null ? null : codeValue.id.intValue();
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer requireProspectStatusId(String status, Long companyId) {
+		Integer statusId = prospectStatusId(status, companyId);
+		if (statusId == null) {
+			throw new IllegalArgumentException("Prospect status code value not found for " + status);
+		}
+		return statusId;
+	}
+
+	private String prospectStatusName(Integer statusId, Long companyId) {
+		if (statusId == null) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(PROSPECT_STATUS_CODE_TYPE, null, companyId)) {
+				if (codeValue.id != null && statusId.longValue() == codeValue.id.longValue()) {
+					return normalizeStatus(codeValue.value);
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return statusId.toString();
+		}
+		return statusId.toString();
+	}
+
+	private String requirementLevelName(Integer requirementLevelId, Long companyId) {
+		if (requirementLevelId == null) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(REQUIREMENT_LEVEL_CODE_TYPE, null, companyId)) {
+				if (codeValue.id != null && requirementLevelId.longValue() == codeValue.id.longValue()) {
+					return normalizeStatus(codeValue.value);
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer siteVisitStatusId(String status, Long companyId) {
+		if (!hasText(status)) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(SITE_VISIT_STATUS_CODE_TYPE, null, companyId)) {
+				if (matchesCodeValue(codeValue, status)) {
+					return codeValue.id == null ? null : codeValue.id.intValue();
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer requireSiteVisitStatusId(String status, Long companyId) {
+		Integer statusId = siteVisitStatusId(status, companyId);
+		if (statusId == null) {
+			throw new IllegalArgumentException("Site visit status code value not found for " + status);
+		}
+		return statusId;
+	}
+
+	private void requireSiteVisitStatusValue(Integer statusId, Long companyId) {
+		if (statusId == null || !codeValueIdExists(SITE_VISIT_STATUS_CODE_TYPE, statusId, companyId)) {
+			throw new IllegalArgumentException("Site visit status code value not found");
+		}
+	}
+
+	private String siteVisitStatusName(Integer statusId, Long companyId) {
+		return codeValueName(SITE_VISIT_STATUS_CODE_TYPE, statusId, companyId);
+	}
+
+	private Integer offerStatusId(String status, Long companyId) {
+		if (!hasText(status)) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(OFFER_STATUS_CODE_TYPE, null, companyId)) {
+				if (matchesCodeValue(codeValue, status)) {
+					return codeValue.id == null ? null : codeValue.id.intValue();
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer requireOfferStatusId(String status, Long companyId) {
+		Integer statusId = offerStatusId(status, companyId);
+		if (statusId == null) {
+			throw new IllegalArgumentException("Offer status code value not found for " + status);
+		}
+		return statusId;
+	}
+
+	private String offerStatusName(Integer statusId, Long companyId) {
+		if (statusId == null) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(OFFER_STATUS_CODE_TYPE, null, companyId)) {
+				if (codeValue.id != null && statusId.longValue() == codeValue.id.longValue()) {
+					return normalizeStatus(codeValue.value);
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return statusId.toString();
+		}
+		return statusId.toString();
+	}
+
+	private Integer reservationStatusId(String status, Long companyId) {
+		if (!hasText(status)) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(RESERVATION_STATUS_CODE_TYPE, null, companyId)) {
+				if (matchesCodeValue(codeValue, status)) {
+					return codeValue.id == null ? null : codeValue.id.intValue();
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer requireReservationStatusId(String status, Long companyId) {
+		Integer statusId = reservationStatusId(status, companyId);
+		if (statusId == null) {
+			throw new IllegalArgumentException("Reservation status code value not found for " + status);
+		}
+		return statusId;
+	}
+
+	private List<Integer> reservationStatusIds(List<String> statuses, Long companyId) {
+		List<Integer> statusIds = new ArrayList<>();
+		for (String status : statuses) {
+			Integer statusId = reservationStatusId(status, companyId);
+			if (statusId != null) {
+				statusIds.add(statusId);
+			}
+		}
+		return statusIds;
+	}
+
+	private String reservationStatusName(Integer statusId, Long companyId) {
+		return codeValueName(RESERVATION_STATUS_CODE_TYPE, statusId, companyId);
+	}
+
+	private Integer decisionId(String decision, Long companyId) {
+		if (!hasText(decision)) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(DECISION_CODE_TYPE, null, companyId)) {
+				if (matchesCodeValue(codeValue, decision)) {
+					return codeValue.id == null ? null : codeValue.id.intValue();
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return null;
+		}
+		return null;
+	}
+
+	private Integer requireDecisionId(String decision, Long companyId) {
+		Integer decisionId = decisionId(decision, companyId);
+		if (decisionId == null) {
+			throw new IllegalArgumentException("Decision code value not found for " + decision);
+		}
+		return decisionId;
+	}
+
+	private String decisionName(Integer decisionId, Long companyId) {
+		return codeValueName(DECISION_CODE_TYPE, decisionId, companyId);
+	}
+
+	private boolean codeValueIdExists(String codeType, Integer codeValueId, Long companyId) {
+		if (codeValueId == null) {
+			return false;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(codeType, null, companyId)) {
+				if (codeValue.id != null && codeValueId.longValue() == codeValue.id.longValue()) {
+					return true;
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return false;
+		}
+		return false;
+	}
+
+	private String codeValueName(String codeType, Integer codeValueId, Long companyId) {
+		if (codeValueId == null) {
+			return null;
+		}
+		try {
+			for (ErpCodeValue codeValue : erpCodeValueService.listCodeValues(codeType, null, companyId)) {
+				if (codeValue.id != null && codeValueId.longValue() == codeValue.id.longValue()) {
+					return normalizeStatus(codeValue.value);
+				}
+			}
+		}
+		catch (RuntimeException ex) {
+			return codeValueId.toString();
+		}
+		return codeValueId.toString();
+	}
+
+	private String joinIntegers(List<Integer> values) {
+		return values.stream().map(String::valueOf).reduce((left, right) -> left + "," + right).orElse("");
+	}
+
+	private boolean matchesCodeValue(ErpCodeValue codeValue, String expected) {
+		String normalizedExpected = normalizeStatus(expected);
+		return normalizedExpected.equals(normalizeStatus(codeValue.value)) || normalizedExpected.equals(normalizeStatus(codeValue.externalId));
+	}
+
+	private String normalizeStatus(String value) {
+		return value == null ? null : value.trim().replace(' ', '_').replace('-', '_').toUpperCase(Locale.ROOT);
 	}
 
 	private void requireId(Long value, String message) {
@@ -797,16 +1183,17 @@ public class LeasingService {
 	}
 
 	private void updateProspectStage(Prospect prospect, String nextStatus, String comments, Long updatedBy) {
-		if (prospect == null || prospect.id == null || !isForwardProspectStage(prospect.status, nextStatus)) {
+		if (prospect == null || prospect.id == null || !isForwardProspectStage(prospect.status, nextStatus, prospect.companyId)) {
 			return;
 		}
-		prospectMapper.updateProspectStatus(prospect.id, nextStatus, updatedBy);
-		statusHistoryMapper.insertHistory("PROSPECT", prospect.id, prospect.status, nextStatus, comments, updatedBy);
-		prospect.status = nextStatus;
+		Integer nextStatusId = requireProspectStatusId(nextStatus, prospect.companyId);
+		prospectMapper.updateProspectStatus(prospect.id, nextStatusId, updatedBy);
+		statusHistoryMapper.insertHistory("PROSPECT", prospect.id, prospectStatusName(prospect.status, prospect.companyId), nextStatus, comments, updatedBy);
+		prospect.status = nextStatusId;
 	}
 
-	private boolean isForwardProspectStage(String currentStatus, String nextStatus) {
-		return prospectStageRank(nextStatus) >= prospectStageRank(currentStatus);
+	private boolean isForwardProspectStage(Integer currentStatus, String nextStatus, Long companyId) {
+		return prospectStageRank(nextStatus) >= prospectStageRank(prospectStatusName(currentStatus, companyId));
 	}
 
 	private boolean isAllowedOfferTransition(String currentStatus, String nextStatus) {
@@ -984,7 +1371,7 @@ public class LeasingService {
 		lead.contactPerson = firstText(request.contactPerson, lead.contactPerson);
 		lead.mobileNo = request.mobileNo;
 		lead.email = firstText(request.email, lead.email);
-		lead.preferredContactMethod = firstText(request.preferredContactMethod, lead.preferredContactMethod);
+		lead.preferredContactMethod = firstInteger(request.preferredContactMethod, lead.preferredContactMethod);
 		lead.updatedBy = createdBy;
 		leadMapper.updateLead(lead);
 	}
@@ -1001,7 +1388,8 @@ public class LeasingService {
 
 	private Reservation changeReservationStatus(Long reservationId, String nextStatus, Long updatedBy) {
 		Reservation reservation = reservationMapper.getReservation(reservationId);
-		reservationMapper.updateReservationStatus(reservationId, nextStatus, updatedBy);
+		String currentStatus = reservationStatusName(reservation.status, reservation.companyId);
+		reservationMapper.updateReservationStatus(reservationId, requireReservationStatusId(nextStatus, reservation.companyId), updatedBy);
 		if (reservation.unitId != null && ("CANCELLED".equals(nextStatus) || "EXPIRED".equals(nextStatus))) {
 			unitMapper.updateUnitStatus(reservation.unitId, "AVAILABLE", updatedBy);
 		}
@@ -1009,7 +1397,7 @@ public class LeasingService {
 			Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
 			updateProspectStage(prospect, "RESERVATION_IN_PROGRESS", "Reservation moved to lease", updatedBy);
 		}
-		statusHistoryMapper.insertHistory("RESERVATION", reservationId, reservation.status, nextStatus, "Reservation status changed", updatedBy);
+		statusHistoryMapper.insertHistory("RESERVATION", reservationId, currentStatus, nextStatus, "Reservation status changed", updatedBy);
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservationId);
 	}

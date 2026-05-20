@@ -7,11 +7,11 @@
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
 		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
-		<result column="requirement_level" property="requirementLevel" jdbcType="VARCHAR" />
+		<result column="requirement_level" property="requirementLevel" jdbcType="INTEGER" />
 		<result column="block_name" property="blockName" jdbcType="VARCHAR" />
 		<result column="floor_name" property="floorName" jdbcType="VARCHAR" />
 		<result column="preferred_unit_id" property="preferredUnitId" jdbcType="BIGINT" />
-		<result column="unit_type" property="unitType" jdbcType="VARCHAR" />
+		<result column="unit_type" property="unitType" jdbcType="INTEGER" />
 		<result column="bedrooms" property="bedrooms" jdbcType="INTEGER" />
 		<result column="area_from" property="areaFrom" jdbcType="DECIMAL" />
 		<result column="area_to" property="areaTo" jdbcType="DECIMAL" />

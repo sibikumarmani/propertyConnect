@@ -9,11 +9,13 @@ public class SiteVisit extends AuditModel {
 	public Long prospectId;
 	public Long propertyId;
 	public String propertyName;
-	public String requirementLevel;
+	public Integer requirementLevel;
+	public Long blockId;
 	public String blockName;
+	public Long floorId;
 	public String floorName;
 	public Long unitId;
 	public Date visitAt;
-	public String status;
+	public Integer status;
 	public String notes;
 }

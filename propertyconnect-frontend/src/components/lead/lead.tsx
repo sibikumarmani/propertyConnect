@@ -27,6 +27,10 @@ type LeadBoardProps = {
   leadStatusFilter: string;
   leadStatuses: string[];
   customerTypeOptions: ErpCodeValue[];
+  preferredContactOptions: ErpCodeValue[];
+  leadSourceOptions: ErpCodeValue[];
+  leadPurposeOptions: ErpCodeValue[];
+  leadStatusOptions: ErpCodeValue[];
   customers: BusinessParty[];
   customerLookupLoading: boolean;
   customerLookupOpen: boolean;
@@ -75,7 +79,7 @@ type ProspectDetails = {
   mobileNo: string;
   phoneNo: string;
   email: string;
-  preferredContactMethod: string;
+  preferredContactMethod?: number;
   faxNo: string;
   address: string;
   source: string;
@@ -91,11 +95,9 @@ const initialLead: Lead = {
   contactPerson: "",
   mobileNo: "",
   email: "",
-  preferredContactMethod: "WhatsApp",
-  purpose: "RENT",
 };
 const initialLeadStageTarget: LeadStageTarget = "QUALIFIED";
-const preferredContactOptions = ["WhatsApp", "Email", "Phone Call", "SMS"];
+const leadListStatusKeys = ["NEW", "QUALIFIED", "CONVERTED_TO_PROSPECT"] as const;
 
 function initialProspectDetails(lead?: Lead): ProspectDetails {
   return {
@@ -111,11 +113,11 @@ function initialProspectDetails(lead?: Lead): ProspectDetails {
     mobileNo: lead?.mobileNo ?? "",
     phoneNo: "",
     email: lead?.email ?? "",
-    preferredContactMethod: lead?.preferredContactMethod ?? "WhatsApp",
+    preferredContactMethod: lead?.preferredContactMethod,
     faxNo: "",
     address: "",
     source: "",
-    purpose: lead?.purpose ?? "RENT",
+    purpose: lead?.purpose === undefined ? "" : String(lead.purpose),
     commercialNeed: "",
     documentNotes: "",
   };
@@ -130,6 +132,10 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [customerTypeOptions, setCustomerTypeOptions] = useState<ErpCodeValue[]>([]);
+  const [preferredContactOptions, setPreferredContactOptions] = useState<ErpCodeValue[]>([]);
+  const [leadSourceOptions, setLeadSourceOptions] = useState<ErpCodeValue[]>([]);
+  const [leadPurposeOptions, setLeadPurposeOptions] = useState<ErpCodeValue[]>([]);
+  const [leadStatusOptions, setLeadStatusOptions] = useState<ErpCodeValue[]>([]);
   const [customers, setCustomers] = useState<BusinessParty[]>([]);
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false);
   const [customerLookupOpen, setCustomerLookupOpen] = useState(false);
@@ -151,12 +157,24 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
 
   const selectedLead = useMemo(() => leads.find((lead) => (selectedLeadId ? lead.id === selectedLeadId : lead.id)) ?? null, [leads, selectedLeadId]);
   const selectedLeadProspect = useMemo(() => prospects.find((prospect) => prospect.leadId === selectedLead?.id) ?? null, [prospects, selectedLead]);
-  const leadStatuses = useMemo(() => ["ALL", ...Array.from(new Set(leads.flatMap((lead) => (lead.status ? [lead.status] : []))))], [leads]);
+  const leadStatuses = useMemo(() => {
+    const options = leadStatusOptions.flatMap((status) => {
+      const key = codeValueKeyFromText(status.value);
+      return key && isLeadListStatusKey(key) ? [key] : [];
+    });
+    for (const lead of leads) {
+      const key = leadStatusKey(lead, leadStatusOptions);
+      if (key && isLeadListStatusKey(key) && !options.includes(key)) {
+        options.push(key);
+      }
+    }
+    return ["ALL", ...options];
+  }, [leadStatusOptions, leads]);
   const filteredLeads = useMemo(() => {
     const query = leadSearch.trim().toLowerCase();
 
     return leads.filter((lead) => {
-      const matchesStatus = leadStatusFilter === "ALL" || lead.status === leadStatusFilter;
+      const matchesStatus = leadStatusFilter === "ALL" || leadStatusKey(lead, leadStatusOptions) === leadStatusFilter;
       const matchesQuery =
         !query ||
         [
@@ -167,21 +185,21 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
           lead.contactPerson,
           lead.mobileNo,
           lead.email,
-          lead.preferredContactMethod,
-          lead.purpose,
-          lead.status,
+          codeValueLabel(preferredContactOptions, lead.preferredContactMethod),
+          codeValueLabel(leadPurposeOptions, lead.purpose),
+          codeValueLabel(leadStatusOptions, lead.status),
         ].some((value) => String(value ?? "").toLowerCase().includes(query));
 
       return matchesStatus && matchesQuery;
     });
-  }, [leadSearch, leadStatusFilter, leads]);
+  }, [leadPurposeOptions, leadSearch, leadStatusFilter, leadStatusOptions, leads, preferredContactOptions]);
   const leadStageCards = useMemo<LeadStageCard[]>(
     () => [
-      { label: "New leads", value: leads.filter((lead) => !lead.status || lead.status === "NEW").length, caption: "Fresh enquiries", icon: UserPlus },
-      { label: "Qualified", value: leads.filter((lead) => lead.status === "QUALIFIED").length, caption: "Ready to convert", icon: BadgeCheck },
+      { label: "New leads", value: leads.filter((lead) => leadStatusKey(lead, leadStatusOptions) === "NEW").length, caption: "Fresh enquiries", icon: UserPlus },
+      { label: "Qualified", value: leads.filter((lead) => leadStatusKey(lead, leadStatusOptions) === "QUALIFIED").length, caption: "Ready to convert", icon: BadgeCheck },
       { label: "Prospects", value: prospects.length, caption: "Converted pipeline", icon: UserCheck },
     ],
-    [leads, prospects.length],
+    [leadStatusOptions, leads, prospects.length],
   );
   const meta = leadScreenMeta[screen];
   const Icon = meta.icon;
@@ -191,10 +209,14 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
     setLoading(true);
     setError("");
     try {
-      const [loadedLeads, loadedProspects, loadedCustomerTypes] = await Promise.all([listLeads(), listProspects(), listCodeValues("cf_firm_type")]);
+      const [loadedLeads, loadedProspects, loadedCustomerTypes, loadedContactMethods, loadedLeadSources, loadedLeadPurposes, loadedLeadStatuses] = await Promise.all([listLeads(), listProspects(), listCodeValues("cf_firm_type"), listCodeValues("oc_communicate_through"), listCodeValues("oc_lead_source"), listCodeValues("oc_lead_purpose"), listCodeValues("oc_lead_status")]);
       setLeads(loadedLeads);
       setProspects(loadedProspects);
       setCustomerTypeOptions(loadedCustomerTypes);
+      setPreferredContactOptions(loadedContactMethods);
+      setLeadSourceOptions(loadedLeadSources);
+      setLeadPurposeOptions(loadedLeadPurposes);
+      setLeadStatusOptions(loadedLeadStatuses);
       setSelectedLeadId((currentId) => {
         if (currentId && loadedLeads.some((lead) => lead.id === currentId)) {
           return currentId;
@@ -236,7 +258,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
       if (leadDrawerMode === "edit" && leadForm.id) {
         await updateLead(leadForm.id, leadForm);
       } else {
-        await createLead(leadForm);
+        await createLead({ ...leadForm, status: leadStatusIdByKey(leadStatusOptions, "NEW") ?? leadForm.status });
       }
       setLeadForm(initialLead);
       setCustomerSearch("");
@@ -253,7 +275,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   }
 
   function openEditLead(lead: Lead) {
-    setLeadForm({ ...lead, purpose: lead.purpose ?? "RENT" });
+    setLeadForm({ ...lead });
     setCustomerSearch(lead.customerCode ?? "");
     setCustomerLookupOpen(false);
     setLeadDrawerMode("edit");
@@ -304,7 +326,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
       contactPerson: "",
       mobileNo: "",
       email: "",
-      preferredContactMethod: currentLead.preferredContactMethod || "WhatsApp",
+      preferredContactMethod: currentLead.preferredContactMethod,
     }));
     setCustomerSearch("");
     setCustomers([]);
@@ -312,11 +334,11 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   }
 
   function openMoveStage(lead: Lead) {
-    if (isLeadConvertedToProspect(lead)) {
+    if (prospects.some((prospect) => prospect.leadId === lead.id)) {
       return;
     }
     setStageLead(lead);
-    setStageTarget(lead.status === "QUALIFIED" ? "CONVERTED_TO_PROSPECT" : "QUALIFIED");
+    setStageTarget(leadStatusKey(lead, leadStatusOptions) === "QUALIFIED" ? "CONVERTED_TO_PROSPECT" : "QUALIFIED");
     setStageScore(String(lead.qualificationScore ?? 80));
     setStageNotes(lead.qualificationNotes ?? "");
     setStageProspectDetails(initialProspectDetails(lead));
@@ -332,7 +354,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
       if (stageTarget === "QUALIFIED") {
         await qualifyLead(stageLead.id!, { score: Number(stageScore), notes: stageNotes });
       } else {
-        await convertLeadToProspect(stageLead.id!, undefined, stageLead.customerId ? undefined : stageProspectDetails);
+        await convertLeadToProspect(stageLead.id!, undefined, stageLead.customerId ? undefined : prospectDetailsPayload(stageProspectDetails));
       }
       setStageLead(null);
     }, stageTarget === "QUALIFIED" ? "Lead moved to qualified." : "Lead converted to prospect.");
@@ -372,6 +394,10 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
           leadStatusFilter={leadStatusFilter}
           leadStatuses={leadStatuses}
           customerTypeOptions={customerTypeOptions}
+          preferredContactOptions={preferredContactOptions}
+          leadSourceOptions={leadSourceOptions}
+          leadPurposeOptions={leadPurposeOptions}
+          leadStatusOptions={leadStatusOptions}
           customers={customers}
           customerLookupLoading={customerLookupLoading}
           customerLookupOpen={customerLookupOpen}
@@ -417,6 +443,8 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
               customerLookupOpen={customerLookupOpen}
               customerSearch={customerSearch}
               customerTypeOptions={customerTypeOptions}
+              preferredContactOptions={preferredContactOptions}
+              leadPurposeOptions={leadPurposeOptions}
               leadForm={leadForm}
               wide
               onCustomerSearchChange={setCustomerSearch}
@@ -445,6 +473,10 @@ function LeadBoard({
   leadStatusFilter,
   leadStatuses,
   customerTypeOptions,
+  preferredContactOptions,
+  leadSourceOptions,
+  leadPurposeOptions,
+  leadStatusOptions,
   customers,
   customerLookupLoading,
   customerLookupOpen,
@@ -523,7 +555,7 @@ function LeadBoard({
               <select className="field rounded-lg px-3 py-3 text-sm" onChange={(event) => onLeadStatusFilterChange(event.target.value)} value={leadStatusFilter}>
                 {leadStatuses.map((status) => (
                   <option key={status} value={status}>
-                    {status === "ALL" ? "All status" : formatLabel(status)}
+                    {status === "ALL" ? "All status" : leadStatusLabelByKey(leadStatusOptions, status) ?? formatLabel(status)}
                   </option>
                 ))}
               </select>
@@ -556,15 +588,15 @@ function LeadBoard({
                         <p className="truncate text-sm font-semibold text-[color:var(--brand-strong)]">{lead.customerName || "Unnamed lead"}</p>
                         <p className="mt-1 truncate text-xs font-medium text-[color:var(--foreground-muted)]">{lead.leadNo ?? "Lead number pending"}</p>
                       </div>
-                      <StatusPill status={lead.status} />
+                      <StatusPill status={leadStatusKey(lead, leadStatusOptions)} label={codeValueLabel(leadStatusOptions, lead.status)} />
                     </div>
                     <div className="mt-3 grid gap-1 text-xs text-[color:var(--foreground-muted)]">
                       <p className="truncate">{lead.mobileNo || "-"}</p>
                       <p className="truncate">{lead.email || "Email not captured"}</p>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <SmallPill label={lead.purpose ?? "Purpose pending"} />
-                      <SmallPill label={lead.preferredContactMethod ?? "Contact pending"} />
+                      <SmallPill label={codeValueLabel(leadPurposeOptions, lead.purpose) ?? "Purpose pending"} />
+                      <SmallPill label={codeValueLabel(preferredContactOptions, lead.preferredContactMethod) ?? "Contact pending"} />
                     </div>
                   </button>
                 </article>
@@ -573,7 +605,7 @@ function LeadBoard({
           </div>
         </section>
 
-        <LeadDetailPanel lead={selectedLead} prospect={selectedLeadProspect} onEditLead={onEditLead} onMoveStage={onMoveStage} />
+        <LeadDetailPanel lead={selectedLead} prospect={selectedLeadProspect} preferredContactOptions={preferredContactOptions} leadPurposeOptions={leadPurposeOptions} leadStatusOptions={leadStatusOptions} onEditLead={onEditLead} onMoveStage={onMoveStage} />
       </div>
 
       <WorkspaceDrawer eyebrow="Lead" open={leadDrawerMode !== null} title={leadDrawerMode === "edit" ? "Edit lead" : "Create lead"} onClose={onCloseLeadDrawer}>
@@ -584,6 +616,8 @@ function LeadBoard({
             customerLookupOpen={customerLookupOpen}
             customerSearch={customerSearch}
             customerTypeOptions={customerTypeOptions}
+            preferredContactOptions={preferredContactOptions}
+            leadPurposeOptions={leadPurposeOptions}
             leadForm={leadForm}
             onCustomerClear={onCustomerClear}
             onCustomerLookup={onCustomerLookup}
@@ -605,6 +639,10 @@ function LeadBoard({
         notes={stageNotes}
         prospectDetails={stageProspectDetails}
         customerTypeOptions={customerTypeOptions}
+        preferredContactOptions={preferredContactOptions}
+        leadSourceOptions={leadSourceOptions}
+        leadStatusOptions={leadStatusOptions}
+        leadPurposeOptions={leadPurposeOptions}
         saving={saving}
         score={stageScore}
         target={stageTarget}
@@ -619,7 +657,7 @@ function LeadBoard({
   );
 }
 
-function LeadDetailPanel({ lead, prospect, onEditLead, onMoveStage }: { lead: Lead | null; prospect: Prospect | null; onEditLead: (lead: Lead) => void; onMoveStage: (lead: Lead) => void }) {
+function LeadDetailPanel({ lead, prospect, preferredContactOptions, leadPurposeOptions, leadStatusOptions, onEditLead, onMoveStage }: { lead: Lead | null; prospect: Prospect | null; preferredContactOptions: ErpCodeValue[]; leadPurposeOptions: ErpCodeValue[]; leadStatusOptions: ErpCodeValue[]; onEditLead: (lead: Lead) => void; onMoveStage: (lead: Lead) => void }) {
   if (!lead) {
     return (
       <section className="panel rounded-lg p-6">
@@ -628,7 +666,7 @@ function LeadDetailPanel({ lead, prospect, onEditLead, onMoveStage }: { lead: Le
     );
   }
 
-  const canMoveStage = !isLeadConvertedToProspect(lead);
+  const canMoveStage = !prospect;
 
   return (
     <section className="panel overflow-hidden rounded-lg">
@@ -652,7 +690,7 @@ function LeadDetailPanel({ lead, prospect, onEditLead, onMoveStage }: { lead: Le
                 Edit
               </button>
             </div>
-            <StatusPill status={lead.status} />
+            <StatusPill status={leadStatusKey(lead, leadStatusOptions)} label={codeValueLabel(leadStatusOptions, lead.status)} />
           </div>
         </div>
       </div>
@@ -663,8 +701,8 @@ function LeadDetailPanel({ lead, prospect, onEditLead, onMoveStage }: { lead: Le
         <DetailItem label="Customer type" value={lead.customerTypeName} />
         <DetailItem label="Contact person name" value={lead.contactPerson} />
         <DetailItem label="Email" value={lead.email} />
-        <DetailItem label="Preferred contact" value={lead.preferredContactMethod} />
-        <DetailItem label="Purpose" value={lead.purpose} />
+        <DetailItem label="Preferred contact" value={codeValueLabel(preferredContactOptions, lead.preferredContactMethod)} />
+        <DetailItem label="Purpose" value={codeValueLabel(leadPurposeOptions, lead.purpose)} />
         <DetailItem label="Qualification score" value={lead.qualificationScore === undefined ? undefined : String(lead.qualificationScore)} />
         <DetailItem label="Prospect no" value={prospect?.prospectNo} />
       </div>
@@ -680,7 +718,7 @@ function LeadDetailPanel({ lead, prospect, onEditLead, onMoveStage }: { lead: Le
         <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Pipeline stage</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-4">
           {["Lead", "Qualified", "Prospect"].map((stage) => {
-            const reached = isStageReached(stage, lead, prospect);
+            const reached = isStageReached(stage, lead, prospect, leadStatusOptions);
 
             return (
               <div className="rounded-lg border p-3" key={stage} style={{ borderColor: reached ? "var(--brand-border)" : "var(--line)", background: reached ? "var(--brand-tint)" : "var(--surface-raised)" }}>
@@ -702,6 +740,8 @@ function LeadCustomerEntryFields({
   customerLookupOpen,
   customerSearch,
   customerTypeOptions,
+  preferredContactOptions,
+  leadPurposeOptions,
   leadForm,
   wide = false,
   onCustomerClear,
@@ -715,6 +755,8 @@ function LeadCustomerEntryFields({
   customerLookupOpen: boolean;
   customerSearch: string;
   customerTypeOptions: ErpCodeValue[];
+  preferredContactOptions: ErpCodeValue[];
+  leadPurposeOptions: ErpCodeValue[];
   leadForm: Lead;
   wide?: boolean;
   onCustomerClear: () => void;
@@ -818,8 +860,8 @@ function LeadCustomerEntryFields({
       />
       <Field label="Mobile no" value={leadForm.mobileNo ?? ""} onChange={(value) => onLeadFormChange({ ...leadForm, mobileNo: value })} disabled={hasSelectedCustomer} required />
       <Field label="Email" type="email" value={leadForm.email ?? ""} onChange={(value) => onLeadFormChange({ ...leadForm, email: value })} disabled={hasSelectedCustomer} />
-      <Select label="Preferred contact" value={leadForm.preferredContactMethod ?? "WhatsApp"} options={preferredContactOptions} onChange={(value) => onLeadFormChange({ ...leadForm, preferredContactMethod: value })} />
-      <Select label="Purpose" value={leadForm.purpose ?? "RENT"} options={["RENT", "BUY", "INVEST"]} onChange={(value) => onLeadFormChange({ ...leadForm, purpose: value })} />
+      <CodeValueSelect label="Preferred contact" value={leadForm.preferredContactMethod === undefined ? "" : String(leadForm.preferredContactMethod)} options={preferredContactOptions} onChange={(value) => onLeadFormChange({ ...leadForm, preferredContactMethod: numericOptionValue(value) })} />
+      <CodeValueSelect label="Purpose" value={leadForm.purpose === undefined ? "" : String(leadForm.purpose)} options={leadPurposeOptions} onChange={(value) => onLeadFormChange({ ...leadForm, purpose: numericOptionValue(value) })} />
       <Field label="Contact person name" value={leadForm.contactPerson ?? ""} onChange={(value) => onLeadFormChange({ ...leadForm, contactPerson: value })} disabled={hasSelectedCustomer} />
     </>
   );
@@ -830,6 +872,10 @@ function StageMoveDialog({
   notes,
   prospectDetails,
   customerTypeOptions,
+  preferredContactOptions,
+  leadSourceOptions,
+  leadPurposeOptions,
+  leadStatusOptions,
   saving,
   score,
   target,
@@ -844,6 +890,10 @@ function StageMoveDialog({
   notes: string;
   prospectDetails: ProspectDetails;
   customerTypeOptions: ErpCodeValue[];
+  preferredContactOptions: ErpCodeValue[];
+  leadSourceOptions: ErpCodeValue[];
+  leadPurposeOptions: ErpCodeValue[];
+  leadStatusOptions: ErpCodeValue[];
   saving: boolean;
   score: string;
   target: LeadStageTarget;
@@ -861,7 +911,9 @@ function StageMoveDialog({
   const needsQualification = target === "QUALIFIED";
   const needsProspectDetails = target === "CONVERTED_TO_PROSPECT";
   const needsCustomerDetails = needsProspectDetails && !lead.customerId;
-  const cannotConvert = target === "CONVERTED_TO_PROSPECT" && lead.status !== "QUALIFIED";
+  const currentStatus = leadStatusKey(lead, leadStatusOptions) ?? "NEW";
+  const currentStatusLabel = codeValueLabel(leadStatusOptions, lead.status) ?? formatLabel(currentStatus);
+  const cannotConvert = target === "CONVERTED_TO_PROSPECT" && currentStatus !== "QUALIFIED";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -869,10 +921,19 @@ function StageMoveDialog({
       <form className="page-surface relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-[color:var(--line-strong)] p-5 shadow-[0_28px_80px_rgba(15,23,42,0.24)] sm:p-6" onSubmit={onSubmit}>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand)]">Move stage</p>
         <h2 className="display-font mt-2 text-2xl font-semibold text-[color:var(--brand-strong)]">{lead.customerName}</h2>
-        <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">Current stage: {formatLabel(lead.status ?? "NEW")}</p>
+        <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">Current stage: {currentStatusLabel}</p>
 
         <div className="mt-5 grid gap-4">
-          <Select label="Next stage" options={["QUALIFIED", "CONVERTED_TO_PROSPECT"]} value={target} onChange={(value) => onTargetChange(value as LeadStageTarget)} />
+          <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
+            Next stage
+            <select className="field rounded-lg px-3 py-3 text-sm" value={target} onChange={(event) => onTargetChange(event.target.value as LeadStageTarget)}>
+              {(["QUALIFIED", "CONVERTED_TO_PROSPECT"] as LeadStageTarget[]).map((stage) => (
+                <option key={stage} value={stage}>
+                  {leadStageTargetLabel(leadStatusOptions, stage)}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {needsQualification ? (
             <>
@@ -911,15 +972,15 @@ function StageMoveDialog({
               <Field label="Mobile no" value={prospectDetails.mobileNo} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, mobileNo: value })} required />
               <Field label="Phone no" value={prospectDetails.phoneNo} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, phoneNo: value })} />
               <Field label="Email" type="email" value={prospectDetails.email} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, email: value })} />
-              <Select
+              <CodeValueSelect
                 label="Preferred contact"
-                value={prospectDetails.preferredContactMethod}
+                value={prospectDetails.preferredContactMethod === undefined ? "" : String(prospectDetails.preferredContactMethod)}
                 options={preferredContactOptions}
-                onChange={(value) => onProspectDetailsChange({ ...prospectDetails, preferredContactMethod: value })}
+                onChange={(value) => onProspectDetailsChange({ ...prospectDetails, preferredContactMethod: numericOptionValue(value) })}
               />
               <Field label="Fax no" value={prospectDetails.faxNo} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, faxNo: value })} />
-              <Field label="Source" value={prospectDetails.source} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, source: value })} />
-              <Select label="Purpose" value={prospectDetails.purpose} options={["RENT", "BUY", "INVEST"]} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, purpose: value })} />
+              <CodeValueSelect label="Source" value={prospectDetails.source} options={leadSourceOptions} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, source: value })} />
+              <CodeValueSelect label="Purpose" value={prospectDetails.purpose} options={leadPurposeOptions} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, purpose: value })} />
               <Field label="Commercial need" value={prospectDetails.commercialNeed} onChange={(value) => onProspectDetailsChange({ ...prospectDetails, commercialNeed: value })} />
               <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)] sm:col-span-2">
                 Address
@@ -987,21 +1048,6 @@ function Field({
   );
 }
 
-function Select({ label, value, options, onChange, disabled = false }: { label: string; value: string; options: string[]; onChange: (value: string) => void; disabled?: boolean }) {
-  return (
-    <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
-      {label}
-      <select className="field rounded-lg px-3 py-3 text-sm disabled:cursor-not-allowed disabled:bg-[color:var(--surface-muted)] disabled:text-[color:var(--foreground-muted)]" disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {formatLabel(option)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function CodeValueSelect({ label, value, options, onChange, disabled = false }: { label: string; value: string; options: ErpCodeValue[]; onChange: (value: string) => void; disabled?: boolean }) {
   return (
     <label className="grid gap-2 text-sm font-semibold text-[color:var(--brand-strong)]">
@@ -1036,11 +1082,11 @@ function DetailItem({ label, value }: { label: string; value?: string }) {
   );
 }
 
-function StatusPill({ status }: { status?: string }) {
-  const label = status ? formatLabel(status) : "New";
-  const tone = status === "QUALIFIED" || status === "CONVERTED" ? "pill-success" : status === "DISQUALIFIED" ? "pill-danger" : "pill-brand";
+function StatusPill({ status, label }: { status?: string; label?: string }) {
+  const displayLabel = label ?? (status ? formatLabel(status) : "New");
+  const tone = ["QUALIFIED", "CONVERTED_TO_PROSPECT"].includes(status ?? "") ? "pill-success" : ["LOST", "CANCELLED"].includes(status ?? "") ? "pill-danger" : "pill-brand";
 
-  return <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{label}</span>;
+  return <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{displayLabel}</span>;
 }
 
 function SmallPill({ label }: { label: string }) {
@@ -1063,13 +1109,53 @@ function customerTypeIdFromBusinessParty(businessParty: BusinessParty, customerT
   return customerTypes.find((option) => option.value.trim().toLowerCase() === typeName)?.id;
 }
 
+function prospectDetailsPayload(details: ProspectDetails) {
+  return {
+    ...details,
+    source: numericOptionValue(details.source),
+    purpose: numericOptionValue(details.purpose),
+  };
+}
+
 function numericOptionValue(value: unknown) {
   const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
 }
 
-function isLeadConvertedToProspect(lead: Lead) {
-  return lead.status === "CONVERTED_TO_PROSPECT";
+function codeValueLabel(options: ErpCodeValue[], value?: number) {
+  if (value === undefined) {
+    return undefined;
+  }
+  return options.find((option) => option.id === value)?.value ?? String(value);
+}
+
+function codeValueKey(options: ErpCodeValue[], value?: number) {
+  return codeValueKeyFromText(codeValueLabel(options, value));
+}
+
+function codeValueKeyFromText(value?: string) {
+  return value?.trim().replaceAll(" ", "_").replaceAll("-", "_").toUpperCase();
+}
+
+function leadStatusKey(lead: Lead, options: ErpCodeValue[]) {
+  return lead.status === undefined ? "NEW" : codeValueKey(options, lead.status);
+}
+
+function isLeadListStatusKey(value: string): value is (typeof leadListStatusKeys)[number] {
+  return leadListStatusKeys.some((status) => status === value);
+}
+
+function leadStatusIdByKey(options: ErpCodeValue[], key: LeadStageTarget | "NEW") {
+  return options.find((option) => codeValueKeyFromText(option.value) === key)?.id;
+}
+
+function leadStatusLabelByKey(options: ErpCodeValue[], key: string) {
+  const status = options.find((option) => codeValueKeyFromText(option.value) === key);
+  return status?.value;
+}
+
+function leadStageTargetLabel(options: ErpCodeValue[], key: LeadStageTarget) {
+  return codeValueLabel(options, leadStatusIdByKey(options, key)) ?? formatLabel(key);
 }
 
 function formatLabel(value: string) {
@@ -1079,12 +1165,12 @@ function formatLabel(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function isStageReached(stage: string, lead: Lead, prospect: Prospect | null) {
+function isStageReached(stage: string, lead: Lead, prospect: Prospect | null, leadStatusOptions: ErpCodeValue[]) {
   if (stage === "Lead") {
     return true;
   }
   if (stage === "Qualified") {
-    return lead.status === "QUALIFIED" || Boolean(prospect);
+    return leadStatusKey(lead, leadStatusOptions) === "QUALIFIED" || Boolean(prospect);
   }
   if (stage === "Prospect") {
     return Boolean(prospect);

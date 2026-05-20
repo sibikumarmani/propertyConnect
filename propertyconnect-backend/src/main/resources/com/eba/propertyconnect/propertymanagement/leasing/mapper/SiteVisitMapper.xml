@@ -7,12 +7,14 @@
 		<result column="prospect_id" property="prospectId" jdbcType="BIGINT" />
 		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
 		<result column="property_name" property="propertyName" jdbcType="VARCHAR" />
-		<result column="requirement_level" property="requirementLevel" jdbcType="VARCHAR" />
+		<result column="requirement_level" property="requirementLevel" jdbcType="INTEGER" />
+		<result column="block_id" property="blockId" jdbcType="BIGINT" />
 		<result column="block_name" property="blockName" jdbcType="VARCHAR" />
+		<result column="floor_id" property="floorId" jdbcType="BIGINT" />
 		<result column="floor_name" property="floorName" jdbcType="VARCHAR" />
 		<result column="unit_id" property="unitId" jdbcType="BIGINT" />
 		<result column="visit_at" property="visitAt" jdbcType="TIMESTAMP" />
-		<result column="status" property="status" jdbcType="VARCHAR" />
+		<result column="status" property="status" jdbcType="INTEGER" />
 		<result column="notes" property="notes" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
 		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
@@ -21,10 +23,10 @@
 	</resultMap>
 	<insert id="createSiteVisit" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit">
 		INSERT INTO pa_txn_leasing_site_visit (
-			company_id, prospect_id, property_id, property_name, requirement_level, block_name, floor_name, unit_id, visit_at, status, notes, created_by
+			company_id, prospect_id, property_id, property_name, requirement_level, block_id, block_name, floor_id, floor_name, unit_id, visit_at, status, notes, created_by
 		)
 		VALUES (
-			#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{requirementLevel}, #{blockName}, #{floorName}, #{unitId}, #{visitAt}, #{status}, #{notes}, #{createdBy}
+			#{companyId}, #{prospectId}, #{propertyId}, #{propertyName}, #{requirementLevel}, #{blockId}, #{blockName}, #{floorId}, #{floorName}, #{unitId}, #{visitAt}, #{status}, #{notes}, #{createdBy}
 		)
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
@@ -38,7 +40,9 @@
 			property_id = #{propertyId},
 			property_name = #{propertyName},
 			requirement_level = #{requirementLevel},
+			block_id = #{blockId},
 			block_name = #{blockName},
+			floor_id = #{floorId},
 			floor_name = #{floorName},
 			unit_id = #{unitId},
 			visit_at = #{visitAt},

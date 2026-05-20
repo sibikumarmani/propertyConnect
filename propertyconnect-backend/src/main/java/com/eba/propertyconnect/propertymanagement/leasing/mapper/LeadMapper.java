@@ -18,7 +18,7 @@ public interface LeadMapper {
 
 	public int updateLead(Lead lead);
 
-	public int qualifyLead(@Param("id") Long id, @Param("score") Integer score, @Param("notes") String notes, @Param("updatedBy") Long updatedBy);
+	public int qualifyLead(@Param("id") Long id, @Param("status") Integer status, @Param("score") Integer score, @Param("notes") String notes, @Param("updatedBy") Long updatedBy);
 
-	public int updateLeadStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);
+	public int updateLeadStatus(@Param("id") Long id, @Param("status") Integer status, @Param("updatedBy") Long updatedBy);
 }

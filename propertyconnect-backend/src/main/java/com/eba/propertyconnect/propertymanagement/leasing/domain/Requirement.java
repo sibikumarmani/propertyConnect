@@ -10,11 +10,11 @@ public class Requirement extends AuditModel {
 	public Long prospectId;
 	public Long propertyId;
 	public String propertyName;
-	public String requirementLevel;
+	public Integer requirementLevel;
 	public String blockName;
 	public String floorName;
 	public Long preferredUnitId;
-	public String unitType;
+	public Integer unitType;
 	public Integer bedrooms;
 	public BigDecimal areaFrom;
 	public BigDecimal areaTo;
