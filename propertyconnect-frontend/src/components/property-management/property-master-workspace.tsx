@@ -46,6 +46,7 @@ import {
 } from "@/lib/property-management";
 
 type TabKey = "profile" | "ownership" | "documents" | "structure" | "commercial" | "operations";
+type ReadOnlyTabKey = "profile" | "documents" | "blocks" | "amenities" | "operating" | "workflow";
 type DraftRecord = MasterRecord & { draftKey?: string; kind?: "block" | "floor" | "unit" | "amenity" };
 type OwnershipRow = PropertyOwnershipRow & { draftKey: string; shareRight: string; reference: string; status: string };
 type DocumentRow = Omit<PropertyDocumentRow, "updatedDate"> & { draftKey: string; updated: string; status: string };
@@ -77,6 +78,16 @@ const tabs: { key: TabKey; label: string; icon: typeof Building2 }[] = [
 const propertyTypes = ["RESIDENCE", "COMMERCIAL", "MIXED_USE", "RETAIL", "STAFF_ACCOMMODATION"];
 const holdingTypes = ["OWN", "LEASED", "MANAGED", "JOINT_VENTURE"];
 const statuses = ["DRAFT", "IN_PROGRESS", "REVIEW", "READY", "ACTIVE"];
+const formLabelClass = "mb-1.5 block min-h-4 text-xs font-bold leading-4 text-[color:var(--foreground-muted)]";
+const formControlClass = "field h-10 w-full rounded-lg px-3 text-sm leading-5";
+const readOnlyTabs: { key: ReadOnlyTabKey; label: string }[] = [
+  { key: "profile", label: "Profile Overview" },
+  { key: "documents", label: "Documents" },
+  { key: "blocks", label: "Buildings / Blocks" },
+  { key: "amenities", label: "Amenities" },
+  { key: "operating", label: "Operating Model" },
+  { key: "workflow", label: "Workflow Status" },
+];
 
 export function PropertyMasterWorkspace() {
   const router = useRouter();
@@ -85,6 +96,7 @@ export function PropertyMasterWorkspace() {
   const [form, setForm] = useState<PropertyMaster>(emptyProperty);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [tab, setTab] = useState<TabKey>("profile");
+  const [readOnlyTab, setReadOnlyTab] = useState<ReadOnlyTabKey>("profile");
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -115,7 +127,7 @@ export function PropertyMasterWorkspace() {
     });
   }, [properties, query, typeFilter]);
 
-  const selectedProperty = useMemo(() => properties.find((property) => property.id === selectedId) ?? null, [properties, selectedId]);
+  const selectedProperty = selectedId && form.id === selectedId ? form : properties.find((property) => property.id === selectedId) ?? null;
 
   const refresh = useCallback(async (preferredId?: number | null) => {
     setLoading(true);
@@ -124,7 +136,7 @@ export function PropertyMasterWorkspace() {
       const loaded = await listProperties({ pageSize: 100 });
       setProperties(loaded);
       const nextId = preferredId && loaded.some((property) => property.id === preferredId) ? preferredId : loaded[0]?.id ?? null;
-      const nextProperty = loaded.find((property) => property.id === nextId) ?? loaded[0] ?? emptyProperty;
+      const nextProperty = nextId ? await getProperty(nextId) : loaded[0] ?? emptyProperty;
       setSelectedId(nextId);
       loadPropertyIntoForm(nextProperty);
     } catch (loadError) {
@@ -179,10 +191,23 @@ export function PropertyMasterWorkspace() {
     setDocumentRows(documentRowsFromProperty(property));
   }
 
-  function selectProperty(property: PropertyMaster) {
+  async function selectProperty(property: PropertyMaster) {
     setSelectedId(property.id ?? null);
     setMessage("");
     setError("");
+    if (!property.id) {
+      loadPropertyIntoForm(property);
+      return;
+    }
+    setSaving(true);
+    try {
+      const loaded = await getProperty(property.id);
+      loadPropertyIntoForm(loaded);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load property details.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function editProperty(property: PropertyMaster) {
@@ -331,6 +356,9 @@ export function PropertyMasterWorkspace() {
           <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold" onClick={() => void refresh(selectedId)} type="button">
             <RefreshCcw className="h-4 w-4" /> Refresh
           </button>
+          <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" disabled={!selectedProperty?.id || saving} onClick={() => selectedProperty ? void editProperty(selectedProperty) : undefined} type="button">
+            Edit
+          </button>
           <button className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold" onClick={startNewProperty} type="button">
             <Plus className="h-4 w-4" /> Create Onboarding Request
           </button>
@@ -363,7 +391,7 @@ export function PropertyMasterWorkspace() {
                 style={{ background: selectedId === property.id ? "var(--brand-tint)" : "var(--surface-raised)", borderColor: selectedId === property.id ? "var(--brand-border)" : "var(--line)" }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <button className="min-w-0 flex-1 text-left" onClick={() => selectProperty(property)} type="button">
+                  <button className="min-w-0 flex-1 text-left" onClick={() => void selectProperty(property)} type="button">
                     <p className="text-sm font-bold text-[color:var(--brand-strong)]">{property.name}</p>
                     <p className="text-xs font-semibold text-[color:var(--foreground-muted)]">{property.code} / {labelize(property.propertyType)} / {property.region || "Region pending"}</p>
                   </button>
@@ -389,13 +417,25 @@ export function PropertyMasterWorkspace() {
           </div>
         </aside>
 
-        <ReadOnlyPropertyPanel property={selectedProperty} onCreate={startNewProperty} onEdit={selectedProperty ? () => void editProperty(selectedProperty) : undefined} onView={selectedProperty?.id ? () => router.push(`/propertyconnect/property-management/property-view?propertyId=${selectedProperty.id}`) : undefined} />
+        <ReadOnlyPropertyPanel
+          activeTab={readOnlyTab}
+          amenities={amenities}
+          blocks={blocks}
+          documents={documentRows}
+          onCreate={startNewProperty}
+          onEdit={selectedProperty ? () => void editProperty(selectedProperty) : undefined}
+          onTabChange={setReadOnlyTab}
+          onView={selectedProperty?.id ? () => router.push(`/propertyconnect/property-management/property-view?propertyId=${selectedProperty.id}`) : undefined}
+          ownership={ownershipRows}
+          property={selectedProperty}
+          workflow={workflow}
+        />
       </div>
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-[color:var(--overlay)]">
           <section className="h-full w-full max-w-6xl overflow-y-auto bg-[color:var(--surface-strong)] shadow-2xl">
-          <div className="flex items-start justify-between border-b border-[color:var(--line)] p-4">
+          <div className="flex items-start justify-between border-b border-[color:var(--line)] px-5 py-4">
             <div>
               <p className="text-xs font-bold text-[color:var(--foreground-muted)]">Property Intake</p>
               <h2 className="text-xl font-bold text-[color:var(--brand-strong)]">{selectedId ? `Edit ${selectedProperty?.name ?? "Property"}` : "New Onboarding Request"}</h2>
@@ -405,20 +445,20 @@ export function PropertyMasterWorkspace() {
             </button>
           </div>
 
-          <div className="m-4 flex gap-1 overflow-x-auto rounded-lg bg-[color:var(--surface-muted)] p-1">
+          <div className="mx-5 mt-5 flex gap-1 overflow-x-auto rounded-lg bg-[color:var(--surface-muted)] p-1">
             {tabs.map((item) => {
               const Icon = item.icon;
               return (
-                <button className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-bold ${tab === item.key ? "bg-[color:var(--surface-raised)] text-[color:var(--brand)] shadow-sm" : "text-[color:var(--foreground-muted)]"}`} key={item.key} onClick={() => setTab(item.key)} type="button">
+                <button className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold ${tab === item.key ? "bg-[color:var(--surface-raised)] text-[color:var(--brand)] shadow-sm" : "text-[color:var(--foreground-muted)]"}`} key={item.key} onClick={() => setTab(item.key)} type="button">
                   <Icon className="h-4 w-4" /> {item.label}
                 </button>
               );
             })}
           </div>
 
-          <form className="px-4 pb-4" onSubmit={submitProperty}>
+          <form className="px-5 pb-5 pt-5" onSubmit={submitProperty}>
             {tab === "profile" ? (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-4 lg:grid-cols-2">
                 <Field label="Property Name" required value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
                 <SelectField label="Property Holding Type" value={form.ownershipType} onChange={(value) => setForm({ ...form, ownershipType: value })} options={holdingTypes} />
                 <SelectField label="Type" value={form.propertyType} onChange={(value) => setForm({ ...form, propertyType: value })} options={propertyTypes} />
@@ -444,7 +484,7 @@ export function PropertyMasterWorkspace() {
                     <EditableCell value={row.shareRight} onChange={(value) => updateOwnership(index, { shareRight: value })} />
                     <EditableCell value={row.reference} onChange={(value) => updateOwnership(index, { reference: value })} />
                     <EditableCell value={row.status} onChange={(value) => updateOwnership(index, { status: value })} />
-                    <RemoveCell persisted={Boolean(row.id)} onRemove={() => removeDraftRow("ownership", index)} />
+                    <RemoveCell onRemove={() => removeDraftRow("ownership", index)} />
                   </tr>
                 ))}
               />
@@ -462,7 +502,7 @@ export function PropertyMasterWorkspace() {
                     <EditableCell value={row.reference} onChange={(value) => updateDocument(index, { reference: value })} />
                     <EditableCell type="date" value={row.updated} onChange={(value) => updateDocument(index, { updated: value })} />
                     <EditableCell value={row.status} onChange={(value) => updateDocument(index, { status: value })} />
-                    <RemoveCell persisted={Boolean(row.id)} onRemove={() => removeDraftRow("documents", index)} />
+                    <RemoveCell onRemove={() => removeDraftRow("documents", index)} />
                   </tr>
                 ))}
               />
@@ -476,7 +516,6 @@ export function PropertyMasterWorkspace() {
                   <RecordTable title="Units" records={units} onAdd={() => setUnits([...units, newRecord("unit", units.length + 1, floorId)])} onChange={(index, value) => updateRecord(setUnits, index, value)} onRemove={(index) => removeDraftRow("units", index)} disabled={!floorId && floors.every((row) => !row.id)} />
                   <RecordTable title="Amenities" records={amenities} onAdd={() => setAmenities([...amenities, newRecord("amenity", amenities.length + 1)])} onChange={(index, value) => updateRecord(setAmenities, index, value)} onRemove={(index) => removeDraftRow("amenities", index)} />
                 </div>
-                <p className="text-xs font-semibold text-[color:var(--foreground-muted)]">Saved rows are master data and cannot be removed from this intake screen. Add a new draft row, then save draft or submit to persist it.</p>
               </div>
             ) : null}
 
@@ -515,7 +554,7 @@ export function PropertyMasterWorkspace() {
               </div>
             ) : null}
 
-            <div className="mt-8 flex flex-col gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-6 flex flex-col gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-3 sm:flex-row sm:items-center sm:justify-between">
               <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${statusClass(form.onboardingStatus)}`}>{labelize(form.onboardingStatus)}</span>
               <div className="flex flex-wrap gap-2">
                 <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-60" disabled={saving} onClick={() => void saveDraft()} type="button">
@@ -568,7 +607,7 @@ export function PropertyMasterWorkspace() {
   }
 
   function removeDraftRow(kind: "ownership" | "documents" | "blocks" | "floors" | "units" | "amenities", index: number) {
-    if (!window.confirm("Remove this unsaved row?")) return;
+    if (!window.confirm("Remove this row? Save the property to persist the change.")) return;
     if (kind === "ownership") setOwnershipRows((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
     if (kind === "documents") setDocumentRows((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
     if (kind === "blocks") setBlocks((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
@@ -581,7 +620,10 @@ export function PropertyMasterWorkspace() {
     required(form.name, "Property name is required");
     required(form.propertyType, "Property type is required");
     required(form.region, "Region is required");
-    if (documentRows.some((row) => row.document || row.reference) && documentRows.some((row) => !row.document || !row.reference)) {
+    if (ownershipRows.some((row) => hasOwnershipInput(row) && !row.party.trim())) {
+      throw new Error("Party is required for every ownership row.");
+    }
+    if (documentRows.some((row) => hasDocumentInput(row) && (!row.document.trim() || !row.reference.trim()))) {
       throw new Error("Document and reference are required for every document row.");
     }
   }
@@ -598,7 +640,7 @@ export function PropertyMasterWorkspace() {
       ownerName: firstOwner?.party || form.ownerName,
       onboardingStatus: nextStatus,
       ownershipRows: ownershipRows
-        .filter((row) => row.party.trim() || row.role.trim() || row.shareRight.trim() || row.reference.trim())
+        .filter(hasOwnershipInput)
         .map((row, index) => ({
           id: row.id,
           propertyId: row.propertyId,
@@ -610,7 +652,7 @@ export function PropertyMasterWorkspace() {
           sortOrder: row.sortOrder ?? (index + 1) * 10,
         })),
       documentRows: documentRows
-        .filter((row) => row.document.trim() || row.category.trim() || row.reference.trim())
+        .filter(hasDocumentInput)
         .map((row, index) => ({
           id: row.id,
           propertyId: row.propertyId,
@@ -637,15 +679,29 @@ export function PropertyMasterWorkspace() {
 }
 
 function ReadOnlyPropertyPanel({
+  activeTab,
+  amenities,
+  blocks,
+  documents,
   property,
   onCreate,
   onEdit,
+  onTabChange,
   onView,
+  ownership,
+  workflow,
 }: {
+  activeTab: ReadOnlyTabKey;
+  amenities: DraftRecord[];
+  blocks: DraftRecord[];
+  documents: DocumentRow[];
   property: PropertyMaster | null;
   onCreate: () => void;
   onEdit?: () => void;
+  onTabChange: (tab: ReadOnlyTabKey) => void;
   onView?: () => void;
+  ownership: OwnershipRow[];
+  workflow: WorkflowRow[];
 }) {
   if (!property) {
     return (
@@ -663,7 +719,7 @@ function ReadOnlyPropertyPanel({
   }
 
   return (
-    <section className="panel rounded-lg">
+    <section className="panel overflow-hidden rounded-lg">
       <div className="flex flex-col gap-3 border-b border-[color:var(--line)] p-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-bold text-[color:var(--foreground-muted)]">{property.code}</p>
@@ -681,17 +737,86 @@ function ReadOnlyPropertyPanel({
         <ReadOnlyMetric label="Units" value={property.totalUnits ?? 0} />
         <ReadOnlyMetric label="Amenities" value={property.totalAmenities ?? 0} />
       </div>
-      <div className="grid gap-4 border-t border-[color:var(--line)] p-4 xl:grid-cols-2">
-        <ReadOnlyField label="Holding Type" value={labelize(property.ownershipType)} />
-        <ReadOnlyField label="Property Type" value={labelize(property.propertyType)} />
-        <ReadOnlyField label="Region" value={property.region} />
-        <ReadOnlyField label="Community" value={property.city} />
-        <ReadOnlyField label="Owner" value={property.ownerName} />
-        <ReadOnlyField label="Status" value={labelize(property.onboardingStatus)} />
-        <ReadOnlyField label="Title Deed" value={property.titleDeedNo} />
-        <ReadOnlyField label="RERA Permit" value={property.reraPermitNo} />
-        <ReadOnlyField label="Operating Model" value={property.operatingModel} />
-        <ReadOnlyField label="Facility Manager" value={property.facilityManager} />
+      <div className="px-4 pb-4">
+        <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-[color:var(--surface-muted)] p-1">
+          {readOnlyTabs.map((item) => (
+            <button className={`h-9 shrink-0 rounded-md px-3 text-sm font-bold ${activeTab === item.key ? "bg-[color:var(--surface-raised)] text-[color:var(--brand)] shadow-sm" : "text-[color:var(--foreground-muted)]"}`} key={item.key} onClick={() => onTabChange(item.key)} type="button">
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "profile" ? (
+          <div className="space-y-4">
+            <section className="rounded-lg border border-[color:var(--line)]">
+              <ReadOnlySectionTitle title="Profile Overview" />
+              <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+                <ReadOnlyField label="Property Name" value={property.name} />
+                <ReadOnlyField label="Property Code" value={property.code} />
+                <ReadOnlyField label="Holding Type" value={labelize(property.ownershipType)} />
+                <ReadOnlyField label="Property Type" value={labelize(property.propertyType)} />
+                <ReadOnlyField label="Region" value={property.region} />
+                <ReadOnlyField label="Community" value={property.city} />
+                <ReadOnlyField label="Address" value={property.addressLine1} />
+                <ReadOnlyField label="Category" value={property.description} />
+                <ReadOnlyField label="Operating Model" value={property.operatingModel} />
+                <ReadOnlyField label="Status" value={labelize(property.onboardingStatus)} />
+              </div>
+            </section>
+            <section className="rounded-lg border border-[color:var(--line)]">
+              <ReadOnlySectionTitle title="Ownership" />
+              <ReadOnlyRows
+                columns={["Party", "Role", "Share / Right", "Reference", "Status"]}
+                emptyLabel="No ownership rows saved."
+                flush
+                rows={ownership.map((row) => [row.party, row.role, row.shareRight, row.reference, labelize(row.status)])}
+              />
+            </section>
+          </div>
+        ) : null}
+
+        {activeTab === "documents" ? (
+          <ReadOnlyRows
+            columns={["Document", "Category", "Reference", "Updated", "Status"]}
+            emptyLabel="No documents saved."
+            rows={documents.filter(hasDocumentInput).map((row) => [row.document, row.category, row.reference, row.updated, labelize(row.status)])}
+          />
+        ) : null}
+
+        {activeTab === "blocks" ? (
+          <ReadOnlyRows
+            columns={["Building / Block", "Code", "Description", "Sort", "Status"]}
+            emptyLabel="No buildings or blocks saved."
+            rows={blocks.map((row) => [row.name, row.code, row.description, String(row.sortOrder ?? 0), activeStatusLabel(row.activeStatus)])}
+          />
+        ) : null}
+
+        {activeTab === "amenities" ? (
+          <ReadOnlyRows
+            columns={["Amenity", "Code", "Description", "Sort", "Status"]}
+            emptyLabel="No amenities saved."
+            rows={amenities.map((row) => [row.name, row.code, row.description, String(row.sortOrder ?? 0), activeStatusLabel(row.activeStatus)])}
+          />
+        ) : null}
+
+        {activeTab === "operating" ? (
+          <div className="grid gap-3 rounded-lg border border-[color:var(--line)] p-4 md:grid-cols-2 xl:grid-cols-3">
+            <ReadOnlyField label="Operating Model" value={property.operatingModel} />
+            <ReadOnlyField label="Facility Manager" value={property.facilityManager} />
+            <ReadOnlyField label="Built-up Area" value={formatNumber(property.builtUpArea)} />
+            <ReadOnlyField label="Plot Area" value={formatNumber(property.plotArea)} />
+            <ReadOnlyField label="Market Value" value={formatNumber(property.marketValue)} />
+            <ReadOnlyField label="Annual Service Charge" value={formatNumber(property.annualServiceCharge)} />
+          </div>
+        ) : null}
+
+        {activeTab === "workflow" ? (
+          <ReadOnlyRows
+            columns={["Step", "Owner", "Progress", "State"]}
+            emptyLabel="No workflow rows saved."
+            rows={workflow.map((row) => [row.stepName, row.ownerName, `${row.progressPercent ?? 0}%`, labelize(row.state)])}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -706,11 +831,49 @@ function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
   );
 }
 
+function ReadOnlySectionTitle({ title }: { title: string }) {
+  return <h3 className="border-b border-[color:var(--line)] px-4 py-3 text-sm font-bold text-[color:var(--brand-strong)]">{title}</h3>;
+}
+
 function ReadOnlyField({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-3">
-      <p className="text-xs font-bold text-[color:var(--foreground-muted)]">{label}</p>
-      <p className="mt-1 text-sm font-bold text-[color:var(--brand-strong)]">{value || "Not captured"}</p>
+    <div className="flex min-h-[76px] flex-col justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-4 py-3">
+      <p className="text-xs font-semibold leading-4 text-[color:var(--foreground-muted)]">{label}</p>
+      <p className="mt-1.5 text-sm font-bold leading-5 text-[color:var(--brand-strong)]">{value || "Not captured"}</p>
+    </div>
+  );
+}
+
+function ReadOnlyRows({ columns, rows, emptyLabel, flush = false }: { columns: string[]; rows: Array<Array<string | number | undefined>>; emptyLabel: string; flush?: boolean }) {
+  return (
+    <div className={flush ? "overflow-hidden" : "overflow-hidden rounded-lg border border-[color:var(--line)]"}>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-[color:var(--surface-muted)] text-xs uppercase text-[color:var(--foreground-muted)]">
+            <tr>
+              {columns.map((column) => (
+                <th className="px-4 py-3 font-bold" key={column}>{column}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td className="px-4 py-5 text-[color:var(--foreground-muted)]" colSpan={columns.length}>{emptyLabel}</td>
+              </tr>
+            ) : null}
+            {rows.map((row, rowIndex) => (
+              <tr key={`${row[0] ?? "row"}-${rowIndex}`}>
+                {columns.map((column, columnIndex) => (
+                  <td className="border-t border-[color:var(--line)] px-4 py-3 text-[color:var(--brand-strong)]" key={`${column}-${columnIndex}`}>
+                    {row[columnIndex] !== undefined && row[columnIndex] !== "" ? row[columnIndex] : "Not captured"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -763,7 +926,7 @@ function RecordTable({
                 <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-full rounded-md px-2 py-1" value={row.name ?? ""} onChange={(event) => onChange(index, { ...row, name: event.target.value })} onFocus={() => onSelect?.(row)} /></td>
                 <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-full rounded-md px-2 py-1" value={row.description ?? ""} onChange={(event) => onChange(index, { ...row, description: event.target.value })} /></td>
                 <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-20 rounded-md px-2 py-1" type="number" value={row.sortOrder ?? 0} onChange={(event) => onChange(index, { ...row, sortOrder: Number(event.target.value) })} /></td>
-                <RemoveCell persisted={Boolean(row.id)} onRemove={() => onRemove(index)} />
+                <RemoveCell onRemove={() => onRemove(index)} />
               </tr>
             ))}
           </tbody>
@@ -803,10 +966,10 @@ function EditableCell({ value, onChange, type = "text" }: { value?: string; onCh
   );
 }
 
-function RemoveCell({ persisted, onRemove }: { persisted: boolean; onRemove: () => void }) {
+function RemoveCell({ onRemove }: { onRemove: () => void }) {
   return (
     <td className="border-t border-[color:var(--line)] px-2 py-2 text-right">
-      <button className="btn-secondary inline-flex h-8 w-8 items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-40" disabled={persisted} onClick={onRemove} title={persisted ? "Saved rows cannot be removed here" : "Remove row"} type="button">
+      <button className="btn-secondary inline-flex h-8 w-8 items-center justify-center rounded-md" onClick={onRemove} title="Remove row" type="button">
         <Trash2 className="h-4 w-4" />
       </button>
     </td>
@@ -815,27 +978,27 @@ function RemoveCell({ persisted, onRemove }: { persisted: boolean; onRemove: () 
 
 function Field({ label, value, onChange, required = false }: { label: string; value?: string; onChange: (value: string) => void; required?: boolean }) {
   return (
-    <label className="block">
-      <span className="text-xs font-bold text-[color:var(--foreground-muted)]">{label}{required ? " *" : ""}</span>
-      <input className="field mt-1 w-full rounded-lg px-3 py-2 text-sm" onChange={(event) => onChange(event.target.value)} required={required} value={value ?? ""} />
+    <label className="block min-w-0">
+      <span className={formLabelClass}>{label}{required ? " *" : ""}</span>
+      <input className={formControlClass} onChange={(event) => onChange(event.target.value)} required={required} value={value ?? ""} />
     </label>
   );
 }
 
 function NumberField({ label, value, onChange }: { label: string; value?: number; onChange: (value: number | undefined) => void }) {
   return (
-    <label className="block">
-      <span className="text-xs font-bold text-[color:var(--foreground-muted)]">{label}</span>
-      <input className="field mt-1 w-full rounded-lg px-3 py-2 text-sm" min="0" onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)} type="number" value={value ?? ""} />
+    <label className="block min-w-0">
+      <span className={formLabelClass}>{label}</span>
+      <input className={formControlClass} min="0" onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)} type="number" value={value ?? ""} />
     </label>
   );
 }
 
 function SelectField({ label, value, onChange, options }: { label: string; value?: string; onChange: (value: string) => void; options: string[] }) {
   return (
-    <label className="mt-3 block">
-      <span className="text-xs font-bold text-[color:var(--foreground-muted)]">{label}</span>
-      <select className="field mt-1 w-full rounded-lg px-3 py-2 text-sm" onChange={(event) => onChange(event.target.value)} value={value ?? ""}>
+    <label className="block min-w-0">
+      <span className={formLabelClass}>{label}</span>
+      <select className={formControlClass} onChange={(event) => onChange(event.target.value)} value={value ?? ""}>
         {options.map((option) => <option key={option || "all"} value={option}>{option ? labelize(option) : "All"}</option>)}
       </select>
     </label>
@@ -955,6 +1118,14 @@ function required(value: string | undefined, message: string) {
   return value.trim();
 }
 
+function hasOwnershipInput(row: OwnershipRow) {
+  return Boolean(row.party.trim() || row.reference.trim());
+}
+
+function hasDocumentInput(row: DocumentRow) {
+  return Boolean(row.document.trim() || row.reference.trim());
+}
+
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(value, max));
@@ -972,6 +1143,10 @@ function labelize(value?: string) {
 
 function activeStatusLabel(value?: string) {
   return normalizeActiveStatus(value) === "Y" ? "Active" : "Inactive";
+}
+
+function formatNumber(value?: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString() : "";
 }
 
 function normalizeActiveStatus(value?: string) {

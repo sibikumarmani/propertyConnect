@@ -163,11 +163,17 @@
 			(id, property_id, party, role, share_right, reference, status, sort_order, created_by, updated_by)
 		VALUES
 			(#{id}, #{propertyId}, #{party}, #{role}, #{shareRight}, #{reference}, #{status}, #{sortOrder}, #{createdBy}, #{updatedBy})
-		ON DUPLICATE KEY UPDATE party = VALUES(party), role = VALUES(role), share_right = VALUES(share_right),
+		ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), party = VALUES(party), role = VALUES(role), share_right = VALUES(share_right),
 			reference = VALUES(reference), status = VALUES(status), sort_order = VALUES(sort_order),
 			updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
+
+	<update id="deactivateOwnershipRows">
+		UPDATE pa_mst_property_ownership
+		SET status = 'INACTIVE', updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
+		WHERE property_id = #{propertyId} AND status != 'INACTIVE'
+	</update>
 
 	<select id="listDocumentRows" parameterType="long" resultMap="resultMapDocumentRow">
 		SELECT * FROM pa_mst_property_document WHERE property_id = #{propertyId} AND status != 'INACTIVE' ORDER BY sort_order, id
@@ -178,7 +184,7 @@
 			(id, property_id, document, category, reference, updated_date, status, sort_order, created_by, updated_by)
 		VALUES
 			(#{id}, #{propertyId}, #{document}, #{category}, #{reference}, #{updatedDate}, #{status}, #{sortOrder}, #{createdBy}, #{updatedBy})
-		ON DUPLICATE KEY UPDATE document = VALUES(document), category = VALUES(category), reference = VALUES(reference),
+		ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), document = VALUES(document), category = VALUES(category), reference = VALUES(reference),
 			updated_date = VALUES(updated_date), status = VALUES(status), sort_order = VALUES(sort_order),
 			updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
@@ -196,6 +202,13 @@
 		WHERE parent_id = #{blockId} AND active_status = 'Y'
 		ORDER BY sort_order, name
 	</select>
+
+	<update id="deactivateDocumentRows">
+		UPDATE pa_mst_property_document
+		SET status = 'INACTIVE', updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
+		WHERE property_id = #{propertyId} AND status != 'INACTIVE'
+	</update>
+
 	<select id="listUnits" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_unit WHERE parent_id = #{floorId} AND active_status = 'Y' ORDER BY sort_order, name</select>
 	<select id="listCompanyUnits" parameterType="long" resultMap="resultMapMasterRecord">
 		SELECT id, company_id, property_id, code, name, description, parent_id, sort_order, attributes, status, active_status, updated_by, updated_on

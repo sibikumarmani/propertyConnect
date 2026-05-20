@@ -49,6 +49,7 @@ public class PropertyService {
 		return property;
 	}
 
+	@Transactional(rollbackFor = Exception.class)
 	public PropertyMaster create(PropertyMaster request) {
 		normalizeProperty(request);
 		if (mapper.getPropertyByCode(request.companyId, request.code) != null) {
@@ -66,6 +67,7 @@ public class PropertyService {
 		return get(request.id);
 	}
 
+	@Transactional(rollbackFor = Exception.class)
 	public PropertyMaster saveProfile(Long id, PropertyMaster request) {
 		get(id);
 		normalizeProperty(request);
@@ -76,6 +78,7 @@ public class PropertyService {
 		return get(id);
 	}
 
+	@Transactional(rollbackFor = Exception.class)
 	public PropertyMaster saveDocuments(Long id, PropertyMaster request) {
 		get(id);
 		request.id = id;
@@ -85,6 +88,7 @@ public class PropertyService {
 		return get(id);
 	}
 
+	@Transactional(rollbackFor = Exception.class)
 	public PropertyMaster saveOperatingModel(Long id, PropertyMaster request) {
 		get(id);
 		request.id = id;
@@ -287,6 +291,7 @@ public class PropertyService {
 		if (rows == null) {
 			return;
 		}
+		mapper.deactivateOwnershipRows(propertyId, userId);
 		int sortOrder = 10;
 		for (PropertyOwnershipRow row : rows) {
 			if (row == null || isBlank(row.party) && isBlank(row.role) && isBlank(row.shareRight) && isBlank(row.reference)) {
@@ -310,6 +315,7 @@ public class PropertyService {
 		if (rows == null) {
 			return;
 		}
+		mapper.deactivateDocumentRows(propertyId, userId);
 		int sortOrder = 10;
 		for (PropertyDocumentRow row : rows) {
 			if (row == null || isBlank(row.document) && isBlank(row.category) && isBlank(row.reference)) {

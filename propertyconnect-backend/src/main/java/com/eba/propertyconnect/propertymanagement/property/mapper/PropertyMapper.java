@@ -19,7 +19,7 @@ public interface PropertyMapper {
 
 	public List<PropertyMaster> listProperties(PropertySearch search);
 
-	public PropertyMaster getProperty(Long id);
+	public PropertyMaster getProperty(@Param("id") Long id);
 
 	public PropertyMaster getPropertyByCode(@Param("companyId") Long companyId, @Param("code") String code);
 
@@ -31,23 +31,27 @@ public interface PropertyMapper {
 
 	public int updatePropertyOperatingModel(PropertyMaster property);
 
-	public List<PropertyOwnershipRow> listOwnershipRows(Long propertyId);
+	public List<PropertyOwnershipRow> listOwnershipRows(@Param("propertyId") Long propertyId);
 
 	public int upsertOwnershipRow(PropertyOwnershipRow row);
 
-	public List<PropertyDocumentRow> listDocumentRows(Long propertyId);
+	public int deactivateOwnershipRows(@Param("propertyId") Long propertyId, @Param("updatedBy") Long updatedBy);
+
+	public List<PropertyDocumentRow> listDocumentRows(@Param("propertyId") Long propertyId);
 
 	public int upsertDocumentRow(PropertyDocumentRow row);
 
-	public List<MasterRecord> listBlocks(Long propertyId);
+	public int deactivateDocumentRows(@Param("propertyId") Long propertyId, @Param("updatedBy") Long updatedBy);
 
-	public List<MasterRecord> listFloors(Long blockId);
+	public List<MasterRecord> listBlocks(@Param("propertyId") Long propertyId);
 
-	public List<MasterRecord> listUnits(Long floorId);
+	public List<MasterRecord> listFloors(@Param("blockId") Long blockId);
 
 	public List<MasterRecord> listCompanyUnits(Long companyId);
 
-	public List<MasterRecord> listAmenities(Long propertyId);
+	public List<MasterRecord> listUnits(@Param("floorId") Long floorId);
+
+	public List<MasterRecord> listAmenities(@Param("propertyId") Long propertyId);
 
 	public int insertBlock(MasterRecord record);
 
@@ -73,17 +77,17 @@ public interface PropertyMapper {
 
 	public int deactivateAmenity(@Param("id") Long id, @Param("updatedBy") Long updatedBy);
 
-	public List<WorkflowRow> listWorkflow(Long propertyId);
+	public List<WorkflowRow> listWorkflow(@Param("propertyId") Long propertyId);
 
 	public int upsertWorkflow(WorkflowRow row);
 
-	public List<PropertyTreeNode> treeProperties(Long propertyId);
+	public List<PropertyTreeNode> treeProperties(@Param("propertyId") Long propertyId);
 
-	public List<PropertyTreeNode> treeBlocks(Long propertyId);
+	public List<PropertyTreeNode> treeBlocks(@Param("propertyId") Long propertyId);
 
-	public List<PropertyTreeNode> treeFloors(Long propertyId);
+	public List<PropertyTreeNode> treeFloors(@Param("propertyId") Long propertyId);
 
-	public List<PropertyTreeNode> treeUnits(Long propertyId);
+	public List<PropertyTreeNode> treeUnits(@Param("propertyId") Long propertyId);
 
-	public PropertySummary summary(Long propertyId);
+	public PropertySummary summary(@Param("propertyId") Long propertyId);
 }

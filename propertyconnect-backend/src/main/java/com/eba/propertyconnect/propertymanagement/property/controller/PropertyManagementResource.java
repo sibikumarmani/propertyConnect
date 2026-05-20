@@ -2,6 +2,8 @@ package com.eba.propertyconnect.propertymanagement.property.controller;
 
 import java.time.LocalDate;
 
+import org.apache.ibatis.exceptions.PersistenceException;
+
 import com.eba.propertyconnect.propertymanagement.auth.service.TokenService;
 import com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster;
@@ -333,12 +335,30 @@ public class PropertyManagementResource {
 		catch (IllegalStateException ex) {
 			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(error(ex.getMessage())).build();
 		}
+		catch (PersistenceException ex) {
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(error(databaseErrorMessage(ex))).build();
+		}
+		catch (RuntimeException ex) {
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(error("Property management request failed. Please check the backend log.")).build();
+		}
 	}
 
 	private String error(String message) {
 		JsonObject error = new JsonObject();
 		error.addProperty("message", message);
 		return GSON.toJson(error);
+	}
+
+	private String databaseErrorMessage(Throwable ex) {
+		Throwable current = ex;
+		while (current != null) {
+			String message = current.getMessage();
+			if (message != null && message.toLowerCase().contains("access denied for user")) {
+				return "PropertyConnect database connection failed. Check propertyconnect.db.username and propertyconnect.db.password.";
+			}
+			current = current.getCause();
+		}
+		return "PropertyConnect database request failed. Check the backend log and database configuration.";
 	}
 
 	private Long loggedUserId(Long requestUserId) {

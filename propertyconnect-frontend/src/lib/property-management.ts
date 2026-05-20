@@ -249,20 +249,62 @@ export async function getPropertySummary(propertyId: number) {
 }
 
 async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
-  const response = await fetch(`${propertyManagementBaseUrl}${path}`, {
-    method: options.method ?? "GET",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(payload?.message ?? "Property management request failed.");
+  const url = `${propertyManagementBaseUrl}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: options.method ?? "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+  } catch (error) {
+    throw new Error(networkErrorMessage(error));
   }
-  return payload;
+  const payload = await readResponsePayload(response);
+  if (!response.ok) {
+    throw new Error(errorMessage(payload, response.status));
+  }
+  return payload as T;
+}
+
+async function readResponsePayload(response: Response): Promise<unknown> {
+  const text = await response.text().catch(() => "");
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function errorMessage(payload: unknown, status: number): string {
+  const message = objectValue(payload)?.message;
+  if (typeof message === "string" && message.trim()) {
+    return message;
+  }
+  if (typeof payload === "string" && payload.trim() && !payload.trimStart().startsWith("<!doctype")) {
+    return payload;
+  }
+  if (status === 401 || status === 403) {
+    return "Your session is not authorized for Property Master. Please sign in again.";
+  }
+  if (status >= 500) {
+    return "Property Master backend failed while reading saved records. Check the backend log and database connection.";
+  }
+  return "Property Master request failed. Please refresh and try again.";
+}
+
+function networkErrorMessage(error: unknown): string {
+  if (error instanceof TypeError) {
+    return `Unable to reach Property Master backend at ${propertyManagementBaseUrl}. Check that TomEE is running and that this frontend origin is allowed by CORS.`;
+  }
+  return error instanceof Error && error.message ? error.message : "Unable to reach Property Master backend.";
 }
 
 function withCompanyAndUser<T extends PropertyMaster>(payload: T, userField: "createdBy" | "updatedBy" = "createdBy"): T {
