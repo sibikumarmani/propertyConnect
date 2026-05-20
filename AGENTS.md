@@ -102,6 +102,10 @@ Customer Management:
 
 - [Leasing Module](docs/leasing/leasing.md)
 
+Lease Management:
+
+- [Lease Management](docs/lease-management/lease-management.md)
+
 ## Verification
 
 Backend:
