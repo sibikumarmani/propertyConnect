@@ -26,10 +26,13 @@
 	</resultMap>
 	<resultMap id="resultMapAttachment" type="com.eba.propertyconnect.propertymanagement.legal.domain.LegalCardAttachment">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="legal_card_id" property="legalCardId" jdbcType="BIGINT" />
 		<result column="document_type_id" property="documentTypeId" jdbcType="BIGINT" />
+		<result column="document_name" property="documentName" jdbcType="VARCHAR" />
 		<result column="file_name" property="fileName" jdbcType="VARCHAR" />
 		<result column="content_type" property="contentType" jdbcType="VARCHAR" />
+		<result column="content_data" property="contentData" jdbcType="LONGVARCHAR" />
 		<result column="storage_path" property="storagePath" jdbcType="VARCHAR" />
 		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
 		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
@@ -38,6 +41,7 @@
 	</resultMap>
 	<resultMap id="resultMapTimeline" type="com.eba.propertyconnect.propertymanagement.legal.domain.LegalCardTimeline">
 		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="legal_card_id" property="legalCardId" jdbcType="BIGINT" />
 		<result column="status_id" property="statusId" jdbcType="BIGINT" />
 		<result column="step" property="step" jdbcType="VARCHAR" />
@@ -113,28 +117,42 @@
 			updated_by = #{updatedBy}
 		WHERE id = #{id}
 	</update>
-	<update id="updateLegalCardStatus">
+	<update id="updateLegalCardEditableFields" parameterType="com.eba.propertyconnect.propertymanagement.legal.domain.LegalCard">
 		UPDATE pa_txn_legal_card
-		SET current_stage_id = #{statusId},
-			document_status_id = #{statusId},
+		SET current_stage_id = #{currentStageId},
+			advocate_id = #{advocateId},
+			case_number = #{caseNumber},
 			updated_by = #{updatedBy}
 		WHERE id = #{id}
 	</update>
-	<delete id="deleteAttachments" parameterType="long">DELETE FROM pa_txn_legal_card_attachment WHERE legal_card_id = #{legalCardId}</delete>
+	<update id="updateLegalCardStatus">
+		UPDATE pa_txn_legal_card
+		SET document_status_id = #{statusId},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
+	<update id="updateLegalCardCancelStatus">
+		UPDATE pa_txn_legal_card
+		SET document_status_id = #{documentStatusId},
+			approval_status_id = #{approvalStatusId},
+			updated_by = #{updatedBy}
+		WHERE id = #{id}
+	</update>
+	<delete id="deleteAttachments">DELETE FROM pa_txn_legal_card_attachment WHERE legal_card_id = #{legalCardId} AND company_id = #{companyId}</delete>
 	<insert id="insertAttachment" parameterType="com.eba.propertyconnect.propertymanagement.legal.domain.LegalCardAttachment">
-		INSERT INTO pa_txn_legal_card_attachment (legal_card_id, document_type_id, file_name, created_by)
-		VALUES (#{legalCardId}, #{documentTypeId}, #{fileName}, #{createdBy})
+		INSERT INTO pa_txn_legal_card_attachment (company_id, legal_card_id, document_type_id, document_name, file_name, content_type, content_data, created_by)
+		VALUES (#{companyId}, #{legalCardId}, #{documentTypeId}, #{documentName}, #{fileName}, #{contentType}, #{contentData}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
-	<select id="listAttachments" parameterType="long" resultMap="resultMapAttachment">
-		SELECT * FROM pa_txn_legal_card_attachment WHERE legal_card_id = #{legalCardId} ORDER BY created_on, id
+	<select id="listAttachments" resultMap="resultMapAttachment">
+		SELECT * FROM pa_txn_legal_card_attachment WHERE legal_card_id = #{legalCardId} AND company_id = #{companyId} ORDER BY created_on, id
 	</select>
 	<insert id="insertTimeline" parameterType="com.eba.propertyconnect.propertymanagement.legal.domain.LegalCardTimeline">
-		INSERT INTO pa_txn_legal_card_timeline (legal_card_id, status_id, step, `action`, remarks, created_by)
-		VALUES (#{legalCardId}, #{statusId}, #{step}, #{action}, #{remarks}, #{createdBy})
+		INSERT INTO pa_txn_legal_card_timeline (company_id, legal_card_id, status_id, step, `action`, remarks, created_by)
+		VALUES (#{companyId}, #{legalCardId}, #{statusId}, #{step}, #{action}, #{remarks}, #{createdBy})
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
-	<select id="listTimeline" parameterType="long" resultMap="resultMapTimeline">
-		SELECT * FROM pa_txn_legal_card_timeline WHERE legal_card_id = #{legalCardId} ORDER BY created_on, id
+	<select id="listTimeline" resultMap="resultMapTimeline">
+		SELECT * FROM pa_txn_legal_card_timeline WHERE legal_card_id = #{legalCardId} AND company_id = #{companyId} ORDER BY created_on, id
 	</select>
 </mapper>

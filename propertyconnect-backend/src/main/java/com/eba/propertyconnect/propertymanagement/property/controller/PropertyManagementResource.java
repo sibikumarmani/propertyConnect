@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.apache.ibatis.exceptions.PersistenceException;
 
+import org.apache.ibatis.exceptions.PersistenceException;
+
 import com.eba.propertyconnect.propertymanagement.auth.service.TokenService;
 import com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster;

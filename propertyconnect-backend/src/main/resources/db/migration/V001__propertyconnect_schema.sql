@@ -432,21 +432,26 @@ CREATE TABLE IF NOT EXISTS pa_txn_legal_card (
 
 CREATE TABLE IF NOT EXISTS pa_txn_legal_card_attachment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     legal_card_id BIGINT NOT NULL,
     document_type_id BIGINT NOT NULL,
+    document_name VARCHAR(255) NULL,
     file_name VARCHAR(255) NOT NULL,
     content_type VARCHAR(120) NULL,
+    content_data LONGTEXT NULL,
     storage_path VARCHAR(500) NULL,
     created_by BIGINT NULL,
     created_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by BIGINT NULL,
     updated_on DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_pa_txn_legal_card_att_card (legal_card_id),
+    KEY idx_pa_txn_legal_card_att_company (company_id, legal_card_id),
     CONSTRAINT fk_pa_txn_legal_card_att_card FOREIGN KEY (legal_card_id) REFERENCES pa_txn_legal_card(id)
 );
 
 CREATE TABLE IF NOT EXISTS pa_txn_legal_card_timeline (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    company_id BIGINT NOT NULL,
     legal_card_id BIGINT NOT NULL,
     status_id BIGINT NOT NULL,
     step VARCHAR(120) NOT NULL,
@@ -457,5 +462,6 @@ CREATE TABLE IF NOT EXISTS pa_txn_legal_card_timeline (
     updated_by BIGINT NULL,
     updated_on DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_pa_txn_legal_card_timeline_card (legal_card_id, created_on),
+    KEY idx_pa_txn_legal_card_timeline_company (company_id, legal_card_id, created_on),
     CONSTRAINT fk_pa_txn_legal_card_timeline_card FOREIGN KEY (legal_card_id) REFERENCES pa_txn_legal_card(id)
 );

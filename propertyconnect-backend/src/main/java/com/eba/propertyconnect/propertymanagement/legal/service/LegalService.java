@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import org.mybatis.cdi.Transactional;
@@ -39,7 +40,37 @@ public class LegalService {
 			"RETURN", "Returned",
 			"RETURNED", "Returned",
 			"REJECT", "Rejected",
-			"REJECTED", "Rejected");
+			"REJECTED", "Rejected",
+			"CANCEL", "Cancelled",
+			"CANCELLED", "Cancelled");
+	private static final Map<String, List<String>> LEGAL_WORKFLOW_BY_LABEL = Map.ofEntries(
+			Map.entry(workflowLabelKey("Financial Claim", "Initiated"), List.of("Sent To Collection Team")),
+			Map.entry(workflowLabelKey("Financial Claim", "Sent To Collection Team"), List.of("Sent To AAM")),
+			Map.entry(workflowLabelKey("Financial Claim", "Sent To AAM"), List.of("Sent To HOA")),
+			Map.entry(workflowLabelKey("Financial Claim", "Sent To HOA"), List.of("Sent To RDC Team")),
+			Map.entry(workflowLabelKey("Financial Claim", "Sent To RDC Team"), List.of("Prepare Legal Notice")),
+			Map.entry(workflowLabelKey("Financial Claim", "Prepare Legal Notice"), List.of("Notice Sent Via Aramax")),
+			Map.entry(workflowLabelKey("Financial Claim", "Notice Sent Via Aramax"), List.of("Acknowledgment of Notice Received")),
+			Map.entry(workflowLabelKey("Financial Claim", "Acknowledgment of Notice Received"), List.of("Completed")),
+			Map.entry(workflowLabelKey("Police Case", "Initiated"), List.of("Sent To Asset Team")),
+			Map.entry(workflowLabelKey("Police Case", "Sent To Asset Team"), List.of("Sent To HOA")),
+			Map.entry(workflowLabelKey("Police Case", "Sent To HOA"), List.of("Approved To Hold The Police Case", "Sent To Collection Manager For Police Case")),
+			Map.entry(workflowLabelKey("Police Case", "Approved To Hold The Police Case"), List.of("Police Case Filed")),
+			Map.entry(workflowLabelKey("Police Case", "Sent To Collection Manager For Police Case"), List.of("Police Case Filed")),
+			Map.entry(workflowLabelKey("Police Case", "Police Case Filed"), List.of("Completed")));
+	private static final Map<String, List<String>> LEGAL_WORKFLOW_BY_STATUS = Map.ofEntries(
+			Map.entry(normalizeWorkflowText("Initiated"), List.of("Sent To Collection Team", "Sent To Asset Team")),
+			Map.entry(normalizeWorkflowText("Sent To Collection Team"), List.of("Sent To AAM")),
+			Map.entry(normalizeWorkflowText("Sent To AAM"), List.of("Sent To HOA")),
+			Map.entry(normalizeWorkflowText("Sent To Asset Team"), List.of("Sent To HOA")),
+			Map.entry(normalizeWorkflowText("Sent To HOA"), List.of("Sent To RDC Team", "Approved To Hold The Police Case", "Sent To Collection Manager For Police Case")),
+			Map.entry(normalizeWorkflowText("Sent To RDC Team"), List.of("Prepare Legal Notice")),
+			Map.entry(normalizeWorkflowText("Prepare Legal Notice"), List.of("Notice Sent Via Aramax")),
+			Map.entry(normalizeWorkflowText("Notice Sent Via Aramax"), List.of("Acknowledgment of Notice Received")),
+			Map.entry(normalizeWorkflowText("Acknowledgment of Notice Received"), List.of("Completed")),
+			Map.entry(normalizeWorkflowText("Approved To Hold The Police Case"), List.of("Police Case Filed")),
+			Map.entry(normalizeWorkflowText("Sent To Collection Manager For Police Case"), List.of("Police Case Filed")),
+			Map.entry(normalizeWorkflowText("Police Case Filed"), List.of("Completed")));
 
 	@Inject
 	private LegalCardMapper mapper;
@@ -131,9 +162,15 @@ public class LegalService {
 
 	@Transactional(rollbackFor = Exception.class)
 	public LegalCard createLegalCard(LegalCard request, Long clientId) {
+		if (request != null) {
+			LegalLookups lookups = lookups(request.companyId, clientId);
+			request.currentStageId = defaultId(request.currentStageId, lookupId(lookups.stages, "INITIATED"));
+			request.documentStatusId = defaultId(request.documentStatusId, lookupId(lookups.cardFlows, "INITIATED"));
+			request.approvalStatusId = defaultId(request.approvalStatusId, lookupId(lookups.approvalStatuses, "APPROVED"));
+		}
 		validate(request, true);
 		LegalCard card = request;
-		card.legalCardNo = defaultString(card.legalCardNo, nextLegalCardNo());
+		card.legalCardNo = card.legalCardNo == null || card.legalCardNo.isBlank() ? nextLegalCardNo() : card.legalCardNo;
 		card.priority = defaultString(card.priority, "M");
 		card.comments = requiredComments(card.comments);
 		if (mapper.countByLegalCardNo(card.legalCardNo, null) > 0) {
@@ -141,7 +178,7 @@ public class LegalService {
 		}
 		mapper.insertLegalCard(card);
 		saveAttachments(card);
-		insertTimeline(card.id, card.documentStatusId, "Created", card.comments, card.createdBy);
+		insertTimeline(card.id, card.companyId, clientId, card.documentStatusId, "Created", card.comments, card.createdBy);
 		return getLegalCard(card.id, card.companyId, clientId);
 	}
 
@@ -162,24 +199,16 @@ public class LegalService {
 			throw new IllegalArgumentException("Legal Card not found");
 		}
 		requireSameCompany(existing, companyId);
-		if (!isStatus(existing.documentStatusId, existing.companyId, clientId, "INITIATED")) {
-			throw new IllegalArgumentException("Edit is available only when Document Status is Initiated");
-		}
-		validate(request, false);
+		requireId(request == null ? null : request.currentStageId, "Current Stage is required");
 		LegalCard card = request;
 		card.id = id;
 		card.legalCardNo = existing.legalCardNo;
-		card.currentStageId = existing.currentStageId;
+		card.companyId = existing.companyId;
 		card.documentStatusId = existing.documentStatusId;
 		card.approvalStatusId = existing.approvalStatusId;
 		card.comments = requiredComments(card.comments);
-		if (mapper.countByLegalCardNo(card.legalCardNo, id) > 0) {
-			throw new IllegalArgumentException("Legal Card No must be unique");
-		}
-		mapper.updateLegalCard(card);
-		mapper.deleteAttachments(id);
-		saveAttachments(card);
-		insertTimeline(id, card.documentStatusId, "Updated", card.comments, card.updatedBy);
+		mapper.updateLegalCardEditableFields(card);
+		insertTimeline(id, existing.companyId, clientId, card.documentStatusId, "Updated", card.comments, card.updatedBy);
 		return getLegalCard(id, existing.companyId, clientId);
 	}
 
@@ -211,7 +240,33 @@ public class LegalService {
 		}
 		String comments = requiredComments(request.comments);
 		mapper.updateLegalCardStatus(id, request.statusId, request.updatedBy);
-		insertTimeline(id, request.statusId, "Status Changed", comments, request.updatedBy);
+		insertTimeline(id, card.companyId, clientId, request.statusId, "Status Changed", comments, request.updatedBy);
+		return getLegalCard(id, card.companyId, clientId);
+	}
+
+	@Transactional(rollbackFor = Exception.class)
+	public LegalCard cancel(Long id, Long companyId, LegalWorkflowRequest request, Long clientId) {
+		LegalCard card = mapper.getLegalCard(id);
+		if (card == null) {
+			throw new IllegalArgumentException("Legal Card not found");
+		}
+		requireSameCompany(card, companyId);
+		LegalLookups lookups = lookups(card.companyId, clientId);
+		if (!isStatus(card.documentStatusId, card.companyId, clientId, "INITIATED")) {
+			throw new IllegalArgumentException("Cancel is available only when Document Status is Initiated");
+		}
+		Long cancelledDocumentStatusId = lookupId(lookups.cardFlows, "CANCELLED");
+		if (cancelledDocumentStatusId == null) {
+			throw new IllegalArgumentException("Cancelled document status is not configured in pa_legal_card_flow");
+		}
+		Long cancelledApprovalStatusId = lookupId(lookups.approvalStatuses, "CANCELLED");
+		if (cancelledApprovalStatusId == null) {
+			throw new IllegalArgumentException("Cancelled approval status is not configured in cf_decision");
+		}
+		String comments = requiredComments(request == null ? null : request.comments);
+		Long updatedBy = request == null ? null : request.updatedBy;
+		mapper.updateLegalCardCancelStatus(id, cancelledDocumentStatusId, cancelledApprovalStatusId, updatedBy);
+		insertTimeline(id, card.companyId, clientId, cancelledDocumentStatusId, "Status Changed", comments, updatedBy);
 		return getLegalCard(id, card.companyId, clientId);
 	}
 
@@ -222,17 +277,20 @@ public class LegalService {
 		for (LegalCardAttachment attachment : card.attachments) {
 			requireId(attachment.documentTypeId, "Attachment Document Type is required");
 			requireText(attachment.fileName, "Attachment file name is required");
+			attachment.documentName = emptyToNull(attachment.documentName);
+			attachment.companyId = card.companyId;
 			attachment.legalCardId = card.id;
 			attachment.createdBy = card.createdBy == null ? card.updatedBy : card.createdBy;
 			mapper.insertAttachment(attachment);
 		}
 	}
 
-	private void insertTimeline(Long legalCardId, Long statusId, String action, String remarks, Long userId) {
+	private void insertTimeline(Long legalCardId, Long companyId, Long clientId, Long statusId, String action, String remarks, Long userId) {
 		LegalCardTimeline timeline = new LegalCardTimeline();
+		timeline.companyId = companyId;
 		timeline.legalCardId = legalCardId;
 		timeline.statusId = statusId;
-		timeline.step = "Status #" + statusId;
+		timeline.step = statusLabel(companyId, clientId, statusId);
 		timeline.action = action;
 		timeline.remarks = remarks;
 		timeline.createdBy = userId;
@@ -244,10 +302,16 @@ public class LegalService {
 			return false;
 		}
 		LegalLookups lookups = lookups(card.companyId, clientId);
-		if (lookups.cardFlows != null && lookups.cardFlows.stream().anyMatch(flow -> nextStatusId.equals(flow.id))) {
-			return true;
-		}
-		return false;
+		String legalType = lookupLabel(lookups.legalTypes, card.legalTypeId);
+		String currentStatus = firstText(lookupLabel(lookups.documentStatuses, card.documentStatusId), lookupLabel(lookups.cardFlows, card.documentStatusId), lookupLabel(lookups.stages, card.documentStatusId));
+		String nextStatus = firstText(lookupLabel(lookups.documentStatuses, nextStatusId), lookupLabel(lookups.cardFlows, nextStatusId), lookupLabel(lookups.stages, nextStatusId));
+		return transitionAllowed(LEGAL_WORKFLOW_BY_LABEL.getOrDefault(workflowLabelKey(legalType, currentStatus), List.of()), nextStatus)
+				|| transitionAllowed(LEGAL_WORKFLOW_BY_STATUS.getOrDefault(normalizeWorkflowText(currentStatus), List.of()), nextStatus);
+	}
+
+	private boolean transitionAllowed(List<String> allowedStatuses, String nextStatus) {
+		String normalizedNextStatus = normalizeWorkflowText(nextStatus);
+		return allowedStatuses.stream().anyMatch(status -> normalizeWorkflowText(status).equals(normalizedNextStatus));
 	}
 
 	private List<LegalLookup> tenantLookups(Long companyId) {
@@ -325,6 +389,14 @@ public class LegalService {
 		return value == null ? "" : value.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("^_+|_+$", "");
 	}
 
+	private static String workflowLabelKey(String legalType, String status) {
+		return normalizeWorkflowText(legalType) + ":" + normalizeWorkflowText(status);
+	}
+
+	private static String normalizeWorkflowText(String value) {
+		return value == null ? "" : value.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_").replaceAll("^_+|_+$", "");
+	}
+
 	private List<LegalCard> enrich(List<LegalCard> cards) {
 		return enrich(cards, null);
 	}
@@ -363,7 +435,7 @@ public class LegalService {
 			Map<Long, String> legalTypes, Map<Long, String> stages, Map<Long, String> reasons,
 			Map<Long, String> documentStatuses, Map<Long, String> cardFlows, Map<Long, String> approvalStatuses, Map<Long, String> documentTypes) {
 		card.legalType = labelFor(legalTypes, card.legalTypeId, "Legal Type");
-		card.currentStage = labelFor(stages, card.currentStageId, "Status");
+		card.currentStage = firstText(stages.get(card.currentStageId), "");
 		card.reason = labelFor(reasons, card.reasonId, "Reason");
 		card.tenant = labelFor(tenants, card.tenantId, "Tenant");
 		card.property = labelFor(properties, card.propertyId, "Property");
@@ -376,9 +448,9 @@ public class LegalService {
 		};
 		card.documentStatus = firstText(documentStatuses.get(card.documentStatusId), cardFlows.get(card.documentStatusId), labelForId(card.documentStatusId, "Status"));
 		card.approvalStatus = firstText(approvalStatuses.get(card.approvalStatusId), labelForId(card.approvalStatusId, "Approval Status"));
-		card.attachments = mapper.listAttachments(card.id);
+		card.attachments = mapper.listAttachments(card.id, card.companyId);
 		card.attachments.forEach(attachment -> attachment.documentType = labelFor(documentTypes, attachment.documentTypeId, "Document Type"));
-		card.timeline = mapper.listTimeline(card.id);
+		card.timeline = mapper.listTimeline(card.id, card.companyId);
 		card.timeline.forEach(entry -> {
 			entry.status = firstText(documentStatuses.get(entry.statusId), cardFlows.get(entry.statusId), labelForId(entry.statusId, "Status"));
 			entry.actor = entry.createdBy == null ? "" : "User #" + entry.createdBy;
@@ -393,6 +465,25 @@ public class LegalService {
 				.collect(Collectors.toMap(lookup -> lookup.id, lookup -> defaultString(lookup.label, "#" + lookup.id), (left, right) -> left));
 	}
 
+	private String lookupLabel(List<LegalLookup> lookups, Long id) {
+		if (id == null) {
+			return "";
+		}
+		return (lookups == null ? List.<LegalLookup>of() : lookups).stream()
+				.filter(lookup -> id.equals(lookup.id))
+				.map(lookup -> firstText(lookup.label, lookup.code))
+				.findFirst()
+				.orElse("");
+	}
+
+	private Long lookupId(List<LegalLookup> lookups, String status) {
+		return (lookups == null ? List.<LegalLookup>of() : lookups).stream()
+				.filter(lookup -> statusMatches(lookup, status))
+				.map(lookup -> lookup.id)
+				.findFirst()
+				.orElse(null);
+	}
+
 	private String labelFor(Map<Long, String> values, Long id, String prefix) {
 		if (id == null) {
 			return "";
@@ -404,15 +495,27 @@ public class LegalService {
 		return id == null ? "" : prefix + " #" + id;
 	}
 
+	private String statusLabel(Long companyId, Long clientId, Long statusId) {
+		LegalLookups lookups = lookups(companyId, clientId);
+		return firstText(lookupLabel(lookups.cardFlows, statusId), lookupLabel(lookups.documentStatuses, statusId), lookupLabel(lookups.stages, statusId), labelForId(statusId, "Status"));
+	}
+
 	private List<Long> completedStatusIds(Long companyId, Long clientId) {
-		return lookups(companyId, clientId).documentStatuses.stream()
+		LegalLookups lookups = lookups(companyId, clientId);
+		return List.of(lookups.documentStatuses, lookups.cardFlows).stream()
+				.flatMap(List::stream)
 				.filter(status -> statusMatches(status, "COMPLETED"))
 				.map(status -> status.id)
 				.toList();
 	}
 
 	private boolean isStatus(Long id, Long companyId, Long clientId, String expectedStatus) {
-		return lookups(companyId, clientId).documentStatuses.stream()
+		LegalLookups lookups = lookups(companyId, clientId);
+		return lookups.documentStatuses.stream()
+				.anyMatch(status -> id != null && id.equals(status.id) && statusMatches(status, expectedStatus))
+				|| lookups.cardFlows.stream()
+				.anyMatch(status -> id != null && id.equals(status.id) && statusMatches(status, expectedStatus))
+				|| lookups.stages.stream()
 				.anyMatch(status -> id != null && id.equals(status.id) && statusMatches(status, expectedStatus));
 	}
 
@@ -498,7 +601,30 @@ public class LegalService {
 		return value == null || value.isBlank() ? defaultValue : value;
 	}
 
+	private String emptyToNull(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private Long defaultId(Long value, Long defaultValue) {
+		return value == null || value <= 0 ? defaultValue : value;
+	}
+
+	private Long firstId(Long... values) {
+		for (Long value : values) {
+			if (value != null && value > 0) {
+				return value;
+			}
+		}
+		return null;
+	}
+
 	private String nextLegalCardNo() {
-		return "LC-" + System.currentTimeMillis();
+		for (int attempt = 0; attempt < 20; attempt++) {
+			String legalCardNo = "LC-" + ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L);
+			if (mapper.countByLegalCardNo(legalCardNo, null) == 0) {
+				return legalCardNo;
+			}
+		}
+		throw new IllegalStateException("Unable to generate Legal Card No");
 	}
 }

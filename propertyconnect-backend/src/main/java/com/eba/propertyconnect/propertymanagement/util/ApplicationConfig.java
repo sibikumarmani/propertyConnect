@@ -18,6 +18,8 @@ public final class ApplicationConfig {
 	private static final String PROPERTYCONNECT_DB_USERNAME_PROPERTY = "propertyconnect.db.username";
 	private static final String PROPERTYCONNECT_DB_PASSWORD_PROPERTY = "propertyconnect.db.password";
 	private static final String PROPERTYCONNECT_DB_MAX_POOL_SIZE_PROPERTY = "propertyconnect.db.maxPoolSize";
+	private static final String PROPERTYCONNECT_CORS_ALLOWED_ORIGINS_PROPERTY = "propertyconnect.cors.allowedOrigins";
+	private static final String PROPERTYCONNECT_CORS_ALLOW_LOCALHOST_PROPERTY = "propertyconnect.cors.allowLocalhost";
 	private static final Properties SYSTEM_PROPERTIES = loadSystemProperties();
 
 	private ApplicationConfig() {
@@ -94,10 +96,27 @@ public final class ApplicationConfig {
 		}
 	}
 
+	public static String propertyConnectCorsAllowedOrigins() {
+		return getConfigValue(PROPERTYCONNECT_CORS_ALLOWED_ORIGINS_PROPERTY);
+	}
+
+	public static boolean propertyConnectCorsAllowLocalhost() {
+		String value = getConfigValue(PROPERTYCONNECT_CORS_ALLOW_LOCALHOST_PROPERTY);
+		return !isBlank(value) && Boolean.parseBoolean(value.trim());
+	}
+
 	private static String getConfigValue(String propertyName) {
-		String systemPropertyValue = SYSTEM_PROPERTIES.getProperty(propertyName);
-		if (!isBlank(systemPropertyValue)) {
-			return systemPropertyValue.trim();
+		String jvmPropertyValue = System.getProperty(propertyName);
+		if (!isBlank(jvmPropertyValue)) {
+			return jvmPropertyValue.trim();
+		}
+		String bundledPropertyValue = SYSTEM_PROPERTIES.getProperty(propertyName);
+		if (!isBlank(bundledPropertyValue)) {
+			return bundledPropertyValue.trim();
+		}
+		String environmentValue = System.getenv(propertyName.toUpperCase().replace('.', '_'));
+		if (!isBlank(environmentValue)) {
+			return environmentValue.trim();
 		}
 		return null;
 	}

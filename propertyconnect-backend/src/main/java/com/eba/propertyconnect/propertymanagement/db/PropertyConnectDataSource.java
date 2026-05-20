@@ -27,6 +27,10 @@ public class PropertyConnectDataSource extends PooledDataSourceFactory {
 		return getOrCreateDataSource().getConnection();
 	}
 
+	public static DataSource dataSource() {
+		return getOrCreateDataSource();
+	}
+
 	@PreDestroy
 	public void close() {
 		if (hikariDataSource != null) {
