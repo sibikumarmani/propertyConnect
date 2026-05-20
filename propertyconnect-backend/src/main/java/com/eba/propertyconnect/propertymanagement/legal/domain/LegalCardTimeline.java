@@ -3,6 +3,7 @@ package com.eba.propertyconnect.propertymanagement.legal.domain;
 public class LegalCardTimeline extends LegalAuditModel {
 
 	public Long id;
+	public Long companyId;
 	public Long legalCardId;
 	public Long statusId;
 	public String status;

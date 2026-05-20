@@ -23,15 +23,19 @@ public interface LegalCardMapper {
 
 	public int updateLegalCard(LegalCard card);
 
+	public int updateLegalCardEditableFields(LegalCard card);
+
 	public int updateLegalCardStatus(@Param("id") Long id, @Param("statusId") Long statusId, @Param("updatedBy") Long updatedBy);
 
-	public int deleteAttachments(Long legalCardId);
+	public int updateLegalCardCancelStatus(@Param("id") Long id, @Param("documentStatusId") Long documentStatusId, @Param("approvalStatusId") Long approvalStatusId, @Param("updatedBy") Long updatedBy);
+
+	public int deleteAttachments(@Param("legalCardId") Long legalCardId, @Param("companyId") Long companyId);
 
 	public int insertAttachment(LegalCardAttachment attachment);
 
-	public List<LegalCardAttachment> listAttachments(Long legalCardId);
+	public List<LegalCardAttachment> listAttachments(@Param("legalCardId") Long legalCardId, @Param("companyId") Long companyId);
 
 	public int insertTimeline(LegalCardTimeline timeline);
 
-	public List<LegalCardTimeline> listTimeline(Long legalCardId);
+	public List<LegalCardTimeline> listTimeline(@Param("legalCardId") Long legalCardId, @Param("companyId") Long companyId);
 }

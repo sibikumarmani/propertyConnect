@@ -11,6 +11,8 @@ const allowedApprovalStatusLabels: Record<string, string> = {
   RETURNED: "Returned",
   REJECT: "Rejected",
   REJECTED: "Rejected",
+  CANCEL: "Cancelled",
+  CANCELLED: "Cancelled",
 };
 
 export type LegalLookup = {
@@ -35,10 +37,14 @@ export type LegalLookups = {
 
 export type LegalCardAttachment = {
   id?: number;
+  companyId?: number;
   legalCardId?: number;
   documentTypeId: number;
   documentType?: string;
+  documentName?: string;
   fileName: string;
+  contentType?: string;
+  contentData?: string;
   createdBy?: number;
   createdOn?: string;
   updatedBy?: number;
@@ -47,6 +53,7 @@ export type LegalCardAttachment = {
 
 export type LegalCardTimeline = {
   id?: number;
+  companyId?: number;
   legalCardId?: number;
   statusId: number;
   status?: string;
@@ -148,24 +155,27 @@ export function legalApprovalStatusOptions(statuses: LegalLookup[] = []) {
 }
 
 export async function getLegalDashboard() {
-  const companyId = selectedCompanyId();
-  return request<LegalDashboard>(`/dashboard${companyId ? `?companyId=${companyId}` : ""}`);
+  return request<LegalDashboard>(`/dashboard${legalContextQuery()}`);
 }
 
 export async function searchLegalCards(payload: LegalCardSearch) {
-  return request<LegalCard[]>("/legal-cards/search", { method: "POST", body: withSelectedCompany(payload) });
+  return request<LegalCard[]>(`/legal-cards/search${legalClientQuery()}`, { method: "POST", body: withSelectedCompany(payload) });
 }
 
 export async function createLegalCard(payload: LegalCard) {
-  return request<LegalCard>("/legal-cards", { method: "POST", body: withCreatedBy(withSelectedCompany(payload)) });
+  return request<LegalCard>(`/legal-cards${legalClientQuery()}`, { method: "POST", body: withCreatedBy(withSelectedCompany(payload)) });
 }
 
 export async function updateLegalCard(id: number, payload: LegalCard) {
-  return request<LegalCard>(`/legal-cards/${id}`, { method: "PUT", body: withUpdatedBy(withSelectedCompany(payload)) });
+  return request<LegalCard>(`/legal-cards/${id}${legalClientQuery()}`, { method: "PUT", body: withUpdatedBy(withSelectedCompany(payload)) });
 }
 
 export async function applyLegalWorkflow(id: number, payload: { statusId: number; comments: string; updatedBy?: number }) {
-  return request<LegalCard>(`/legal-cards/${id}/workflow`, { method: "POST", body: withUpdatedBy(payload) });
+  return request<LegalCard>(`/legal-cards/${id}/workflow${legalContextQuery()}`, { method: "POST", body: withUpdatedBy(payload) });
+}
+
+export async function cancelLegalCard(id: number, payload: { comments: string; updatedBy?: number }) {
+  return request<LegalCard>(`/legal-cards/${id}/cancel${legalContextQuery()}`, { method: "POST", body: withUpdatedBy(payload) });
 }
 
 async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -214,6 +224,28 @@ function withUpdatedBy<T extends { updatedBy?: number }>(payload: T): T {
   };
 }
 
+function legalContextQuery() {
+  const params = new URLSearchParams();
+  const companyId = selectedCompanyId();
+  if (companyId) {
+    params.set("companyId", String(companyId));
+  }
+  const clientId = selectedClientId();
+  if (clientId) {
+    params.set("clientId", String(clientId));
+  }
+  return params.size ? `?${params.toString()}` : "";
+}
+
+function legalClientQuery() {
+  const params = new URLSearchParams();
+  const clientId = selectedClientId();
+  if (clientId) {
+    params.set("clientId", String(clientId));
+  }
+  return params.size ? `?${params.toString()}` : "";
+}
+
 function selectedCompanyId(): number | undefined {
   if (typeof window === "undefined") {
     return undefined;
@@ -223,8 +255,8 @@ function selectedCompanyId(): number | undefined {
     return undefined;
   }
   try {
-    const company = JSON.parse(rawCompany) as { companyId?: number; id?: string | number };
-    const value = company.companyId ?? Number(company.id);
+    const company = JSON.parse(rawCompany) as { companyId?: number | string; selectedCompanyId?: number | string; id?: string | number };
+    const value = company.companyId ?? company.selectedCompanyId ?? Number(company.id);
     return Number.isFinite(value) ? Number(value) : undefined;
   } catch {
     return undefined;

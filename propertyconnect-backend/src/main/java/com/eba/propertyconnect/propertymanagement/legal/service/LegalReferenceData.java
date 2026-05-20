@@ -26,16 +26,16 @@ final class LegalReferenceData {
 	private static final Map<Long, String> STATUSES = Map.ofEntries(
 			Map.entry(STATUS_INITIATED, "Initiated"),
 			Map.entry(2L, "Sent to Collection Team"),
-			Map.entry(3L, "AAM Approval"),
-			Map.entry(4L, "HOA Approval"),
+			Map.entry(3L, "Sent To AAM"),
+			Map.entry(4L, "Sent To HOA"),
 			Map.entry(5L, "Sent To RDC Team"),
 			Map.entry(6L, "Prepare Legal Notice"),
 			Map.entry(7L, "Notice Sent Via Aramax"),
 			Map.entry(8L, "Acknowledgment of Notice Received"),
-			Map.entry(9L, "Sent to Asset Team for Confirmation"),
-			Map.entry(10L, "Send to HOA for Approval"),
-			Map.entry(11L, "Approved to Hold the Police Case"),
-			Map.entry(12L, "Send to Collection Manager for Police Case"),
+			Map.entry(9L, "Sent To Asset Team"),
+			Map.entry(10L, "Sent To HOA"),
+			Map.entry(11L, "Approved To Hold The Police Case"),
+			Map.entry(12L, "Sent To Collection Manager For Police Case"),
 			Map.entry(13L, "Police Case Filed"),
 			Map.entry(STATUS_COMPLETED, "Completed"));
 	private static final Map<Long, String> APPROVAL_STATUSES = Map.of(
@@ -55,11 +55,13 @@ final class LegalReferenceData {
 			Map.entry(key(LEGAL_TYPE_FINANCIAL_CLAIM, 5L), List.of(6L)),
 			Map.entry(key(LEGAL_TYPE_FINANCIAL_CLAIM, 6L), List.of(7L)),
 			Map.entry(key(LEGAL_TYPE_FINANCIAL_CLAIM, 7L), List.of(8L)),
+			Map.entry(key(LEGAL_TYPE_FINANCIAL_CLAIM, 8L), List.of(STATUS_COMPLETED)),
 			Map.entry(key(LEGAL_TYPE_POLICE_CASE, STATUS_INITIATED), List.of(9L)),
 			Map.entry(key(LEGAL_TYPE_POLICE_CASE, 9L), List.of(10L)),
 			Map.entry(key(LEGAL_TYPE_POLICE_CASE, 10L), List.of(11L, 12L)),
 			Map.entry(key(LEGAL_TYPE_POLICE_CASE, 11L), List.of(13L)),
-			Map.entry(key(LEGAL_TYPE_POLICE_CASE, 12L), List.of(13L)));
+			Map.entry(key(LEGAL_TYPE_POLICE_CASE, 12L), List.of(13L)),
+			Map.entry(key(LEGAL_TYPE_POLICE_CASE, 13L), List.of(STATUS_COMPLETED)));
 
 	private LegalReferenceData() {
 	}

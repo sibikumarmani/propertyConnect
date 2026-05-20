@@ -60,52 +60,63 @@ public class LegalResource {
 
 	@GET
 	@Path("/dashboard")
-	public Response dashboard(@QueryParam("companyId") Long companyId) {
-		return ok(service.dashboard(loggedCompanyId(companyId), loggedClientId(null)));
+	public Response dashboard(@QueryParam("companyId") Long companyId, @QueryParam("clientId") Long clientId) {
+		return ok(service.dashboard(loggedCompanyId(companyId), loggedClientId(clientId)));
 	}
 
 	@POST
 	@Path("/legal-cards/search")
-	public Response searchLegalCards(LegalCardSearch request) {
+	public Response searchLegalCards(@QueryParam("clientId") Long clientId, LegalCardSearch request) {
 		if (request == null) {
 			request = new LegalCardSearch();
 		}
 		request.companyId = loggedCompanyId(request.companyId);
-		return ok(service.searchLegalCards(request, loggedClientId(null)));
+		return ok(service.searchLegalCards(request, loggedClientId(clientId)));
 	}
 
 	@GET
 	@Path("/legal-cards/{id}")
-	public Response getLegalCard(@PathParam("id") Long id) {
-		return okOrBadRequest(() -> service.getLegalCard(id, loggedCompanyId(null), loggedClientId(null)));
+	public Response getLegalCard(@PathParam("id") Long id, @QueryParam("companyId") Long companyId, @QueryParam("clientId") Long clientId) {
+		return okOrBadRequest(() -> service.getLegalCard(id, optionalLoggedCompanyId(companyId), loggedClientId(clientId)));
 	}
 
 	@POST
 	@Path("/legal-cards")
-	public Response createLegalCard(LegalCard request) {
+	public Response createLegalCard(@QueryParam("clientId") Long clientId, LegalCard request) {
 		return created(() -> {
 			request.companyId = loggedCompanyId(request.companyId);
 			request.createdBy = loggedUserId(request.createdBy);
-			return service.createLegalCard(request, loggedClientId(null));
+			return service.createLegalCard(request, loggedClientId(clientId));
 		});
 	}
 
 	@PUT
 	@Path("/legal-cards/{id}")
-	public Response updateLegalCard(@PathParam("id") Long id, LegalCard request) {
+	public Response updateLegalCard(@PathParam("id") Long id, @QueryParam("clientId") Long clientId, LegalCard request) {
 		return okOrBadRequest(() -> {
 			request.companyId = loggedCompanyId(request.companyId);
 			request.updatedBy = loggedUserId(request.updatedBy);
-			return service.updateLegalCard(id, request.companyId, request, loggedClientId(null));
+			return service.updateLegalCard(id, request.companyId, request, loggedClientId(clientId));
 		});
 	}
 
 	@POST
 	@Path("/legal-cards/{id}/workflow")
-	public Response workflow(@PathParam("id") Long id, LegalWorkflowRequest request) {
+	public Response workflow(@PathParam("id") Long id, @QueryParam("companyId") Long companyId, @QueryParam("clientId") Long clientId, LegalWorkflowRequest request) {
+		LegalWorkflowRequest payload = request == null ? new LegalWorkflowRequest() : request;
 		return okOrBadRequest(() -> {
-			request.updatedBy = loggedUserId(request.updatedBy);
-			return service.workflow(id, loggedCompanyId(null), request, loggedClientId(null));
+			payload.updatedBy = loggedUserId(payload.updatedBy);
+			return service.workflow(id, optionalLoggedCompanyId(companyId), payload, loggedClientId(clientId));
+		});
+	}
+
+	@POST
+	@Path("/legal-cards/{id}/cancel")
+	public Response cancel(@PathParam("id") Long id, @QueryParam("companyId") Long companyId, @QueryParam("clientId") Long clientId, LegalWorkflowRequest request) {
+		LegalWorkflowRequest payload = request == null ? new LegalWorkflowRequest() : request;
+		return okOrBadRequest(() -> {
+			payload.updatedBy = loggedUserId(payload.updatedBy);
+			return service.cancel(id, optionalLoggedCompanyId(companyId), payload, loggedClientId(clientId));
 		});
 	}
 
@@ -155,6 +166,14 @@ public class LegalResource {
 	}
 
 	private Long loggedCompanyId(Long requestCompanyId) {
+		Long companyId = optionalLoggedCompanyId(requestCompanyId);
+		if (companyId != null) {
+			return companyId;
+		}
+		throw new IllegalArgumentException("Logged company is required");
+	}
+
+	private Long optionalLoggedCompanyId(Long requestCompanyId) {
 		HttpSession session = httpRequest == null ? null : httpRequest.getSession(false);
 		if (session != null) {
 			Long selectedCompanyId = toCompanyId(session.getAttribute(SESSION_SELECTED_COMPANY_ID));
@@ -173,7 +192,7 @@ public class LegalResource {
 		if (requestCompanyId != null) {
 			return requestCompanyId;
 		}
-		throw new IllegalArgumentException("Logged company is required");
+		return null;
 	}
 
 	private Long loggedClientId(Long requestClientId) {
