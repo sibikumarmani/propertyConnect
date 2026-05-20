@@ -29,4 +29,6 @@ public interface ReservationMapper {
 	public int addReservationPayment(@Param("id") Long id, @Param("amount") BigDecimal amount, @Param("status") Integer status, @Param("updatedBy") Long updatedBy);
 
 	public boolean hasActiveReservation(@Param("unitId") Long unitId, @Param("statuses") List<Integer> statuses);
+
+	public boolean hasReservationForOffer(@Param("offerId") Long offerId, @Param("excludeReservationId") Long excludeReservationId);
 }

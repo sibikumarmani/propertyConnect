@@ -15,7 +15,7 @@ public interface UnitMapper {
 
 	public Unit getUnit(Long id);
 
-	public List<Unit> searchAvailableUnits(@Param("propertyId") Long propertyId, @Param("unitType") String unitType, @Param("bedrooms") Integer bedrooms,
+	public List<Unit> searchAvailableUnits(@Param("availableStatus") String availableStatus, @Param("propertyId") Long propertyId, @Param("unitType") String unitType, @Param("bedrooms") Integer bedrooms,
 			@Param("budgetTo") BigDecimal budgetTo);
 
 	public int updateUnitStatus(@Param("id") Long id, @Param("status") String status, @Param("updatedBy") Long updatedBy);

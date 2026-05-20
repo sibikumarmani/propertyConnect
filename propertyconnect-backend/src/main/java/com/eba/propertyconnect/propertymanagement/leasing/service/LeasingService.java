@@ -22,11 +22,11 @@ import com.eba.propertyconnect.propertymanagement.leasing.domain.OfferStatusRequ
 import com.eba.propertyconnect.propertymanagement.leasing.domain.PaymentReceipt;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.QualificationRequest;
-import com.eba.propertyconnect.propertymanagement.leasing.domain.ReportSummary;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Requirement;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Reservation;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.ReservationStatusRequest;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.SiteVisit;
+import com.eba.propertyconnect.propertymanagement.leasing.domain.StatusHistory;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.Unit;
 import com.eba.propertyconnect.propertymanagement.leasing.domain.UnitSearch;
 import com.eba.propertyconnect.propertymanagement.leasing.mapper.LeadMapper;
@@ -63,6 +63,8 @@ public class LeasingService {
 	private static final String OFFER_STATUS_CODE_TYPE = "pa_offer_status";
 	private static final String RESERVATION_STATUS_CODE_TYPE = "pa_reservation_status";
 	private static final String DECISION_CODE_TYPE = "cf_decision";
+	private static final String UNIT_STATUS_VACANT = "VACANT";
+	private static final String UNIT_STATUS_RESERVED = "RESERVED";
 
 	@Inject
 	private LeadMapper leadMapper;
@@ -336,7 +338,7 @@ public class LeasingService {
 		requireText(request.unitCode, "Unit code is required");
 		requireText(request.unitType, "Unit type is required");
 		Unit unit = request;
-		unit.status = defaultString(unit.status, "AVAILABLE");
+		unit.status = defaultString(unit.status, UNIT_STATUS_VACANT);
 		unitMapper.createUnit(unit);
 		clearLeasingCache();
 		return unitMapper.getUnit(unit.id);
@@ -348,7 +350,7 @@ public class LeasingService {
 		}
 		UnitSearch search = request;
 		return getShortCache(availableUnitCacheKey(search),
-				() -> unitMapper.searchAvailableUnits(search.propertyId, search.unitType, search.bedrooms, search.budgetTo));
+				() -> unitMapper.searchAvailableUnits(UNIT_STATUS_VACANT, search.propertyId, search.unitType, search.bedrooms, search.budgetTo));
 	}
 
 	public SiteVisit createSiteVisit(SiteVisit request) {
@@ -431,8 +433,8 @@ public class LeasingService {
 		if (visit.floorId != null && propertyMapper.listUnits(visit.floorId).stream().noneMatch(item -> visit.unitId.equals(item.id))) {
 			throw new IllegalArgumentException("Unit does not belong to selected floor");
 		}
-		if (!visit.unitId.equals(existingUnitId) && !"AVAILABLE".equals(unit.status)) {
-			throw new IllegalArgumentException("Only available units can be selected for a site visit");
+		if (!visit.unitId.equals(existingUnitId) && !isVacantUnit(unit)) {
+			throw new IllegalArgumentException("Only vacant units can be selected for a site visit");
 		}
 		visit.propertyName = firstText(visit.propertyName, unit.propertyName);
 	}
@@ -718,6 +720,9 @@ public class LeasingService {
 		if (!"ACCEPTED".equals(offerStatusName(offer.status, offer.companyId))) {
 			throw new IllegalArgumentException("Only accepted offers can be reserved");
 		}
+		if (reservationMapper.hasReservationForOffer(offer.id, reservation.id)) {
+			throw new IllegalArgumentException("Offer is already used for another reservation");
+		}
 		Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
 		if (prospect == null) {
 			throw new IllegalArgumentException("Prospect not found");
@@ -728,8 +733,8 @@ public class LeasingService {
 			if (unit == null) {
 				throw new IllegalArgumentException("Unit not found");
 			}
-			if (!"AVAILABLE".equals(unit.status)) {
-				throw new IllegalArgumentException("Selected unit is not available");
+			if (!isVacantUnit(unit)) {
+				throw new IllegalArgumentException("Selected unit is not vacant");
 			}
 			List<Integer> activeStatuses = reservationStatusIds(List.of("PENDING_APPROVAL", "PAYMENT_PENDING", "PAID", "CONFIRMED"), prospect.companyId);
 			if (!activeStatuses.isEmpty() && reservationMapper.hasActiveReservation(unit.id, activeStatuses)) {
@@ -839,13 +844,13 @@ public class LeasingService {
 		// Business rule: confirmed reservations set unit status to RESERVED in the mapper transaction.
 		reservationMapper.updateReservationStatus(reservationId, requireReservationStatusId("CONFIRMED", reservation.companyId), updatedBy);
 		if (reservation.unitId != null) {
-			unitMapper.updateUnitStatus(reservation.unitId, "RESERVED", updatedBy);
+			unitMapper.updateUnitStatus(reservation.unitId, UNIT_STATUS_RESERVED, updatedBy);
 		}
 		Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
 		updateProspectStage(prospect, "RESERVATION_IN_PROGRESS", "Reservation confirmed", updatedBy);
 		statusHistoryMapper.insertHistory("RESERVATION", reservationId, currentStatus, "CONFIRMED", "Reservation confirmed", updatedBy);
 		if (reservation.unitId != null) {
-			statusHistoryMapper.insertHistory("UNIT", reservation.unitId, null, "RESERVED", "Unit reserved", updatedBy);
+			statusHistoryMapper.insertHistory("UNIT", reservation.unitId, null, UNIT_STATUS_RESERVED, "Unit reserved", updatedBy);
 		}
 		clearLeasingCache();
 		return reservationMapper.getReservation(reservationId);
@@ -853,13 +858,13 @@ public class LeasingService {
 
 	@Transactional(rollbackFor = Exception.class)
 	public Reservation cancelReservation(Long reservationId, Long updatedBy) {
-		// Business rule: cancelled reservations release the unit back to AVAILABLE in the mapper transaction.
+		// Business rule: cancelled reservations release the unit back to VACANT in the mapper transaction.
 		return changeReservationStatus(reservationId, "CANCELLED", updatedBy);
 	}
 
 	@Transactional(rollbackFor = Exception.class)
 	public Reservation expireReservation(Long reservationId, Long updatedBy) {
-		// Business rule: expired reservations release the unit back to AVAILABLE in the mapper transaction.
+		// Business rule: expired reservations release the unit back to VACANT in the mapper transaction.
 		return changeReservationStatus(reservationId, "EXPIRED", updatedBy);
 	}
 
@@ -879,20 +884,11 @@ public class LeasingService {
 		return getCompanyCache(CacheHelper.GET_LEASING_RESERVATIONS, () -> reservationMapper.listReservations(null));
 	}
 
-	public ReportSummary reportSummary() {
-		return getCompanyCache(CacheHelper.GET_LEASING_REPORT_SUMMARY, () -> {
-			ReportSummary summary = new ReportSummary();
-			summary.leads = statusHistoryMapper.count("pa_txn_leasing_lead", null);
-			Integer qualifiedStatus = leadStatusId("QUALIFIED", null);
-			summary.qualifiedLeads = qualifiedStatus == null ? 0 : statusHistoryMapper.count("pa_txn_leasing_lead", "status = " + qualifiedStatus);
-			summary.prospects = statusHistoryMapper.count("pa_txn_leasing_prospect", null);
-			List<Integer> activeReservationStatuses = reservationStatusIds(List.of("DRAFT", "PENDING_APPROVAL", "PAYMENT_PENDING", "PAID"), null);
-			Integer confirmedReservationStatus = reservationStatusId("CONFIRMED", null);
-			summary.activeReservations = activeReservationStatuses.isEmpty() ? 0 : statusHistoryMapper.count("pa_txn_leasing_reservation", "status IN (" + joinIntegers(activeReservationStatuses) + ")");
-			summary.confirmedReservations = confirmedReservationStatus == null ? 0 : statusHistoryMapper.count("pa_txn_leasing_reservation", "status = " + confirmedReservationStatus);
-			summary.latestHistory = statusHistoryMapper.latestHistory();
-			return summary;
-		});
+	public List<StatusHistory> listActivity(String entityType, Long entityId) {
+		if (entityId == null) {
+			throw new IllegalArgumentException("Entity id is required");
+		}
+		return statusHistoryMapper.listEntityHistory(normalizeActivityEntityType(entityType), entityId);
 	}
 
 	private Integer leadStatusId(String status, Long companyId) {
@@ -1163,10 +1159,6 @@ public class LeasingService {
 		return codeValueId.toString();
 	}
 
-	private String joinIntegers(List<Integer> values) {
-		return values.stream().map(String::valueOf).reduce((left, right) -> left + "," + right).orElse("");
-	}
-
 	private boolean matchesCodeValue(ErpCodeValue codeValue, String expected) {
 		String normalizedExpected = normalizeStatus(expected);
 		return normalizedExpected.equals(normalizeStatus(codeValue.value)) || normalizedExpected.equals(normalizeStatus(codeValue.externalId));
@@ -1391,7 +1383,7 @@ public class LeasingService {
 		String currentStatus = reservationStatusName(reservation.status, reservation.companyId);
 		reservationMapper.updateReservationStatus(reservationId, requireReservationStatusId(nextStatus, reservation.companyId), updatedBy);
 		if (reservation.unitId != null && ("CANCELLED".equals(nextStatus) || "EXPIRED".equals(nextStatus))) {
-			unitMapper.updateUnitStatus(reservation.unitId, "AVAILABLE", updatedBy);
+			unitMapper.updateUnitStatus(reservation.unitId, UNIT_STATUS_VACANT, updatedBy);
 		}
 		if ("MOVED_TO_LEASE".equals(nextStatus)) {
 			Prospect prospect = prospectMapper.getProspect(reservation.prospectId);
@@ -1430,13 +1422,24 @@ public class LeasingService {
 		CacheHelper.removeCompanyCache(CacheHelper.getCacheKey(CacheHelper.GET_LEASING_PROSPECTS, LEASING_CACHE_SCOPE));
 		CacheHelper.removeCompanyCache(CacheHelper.getCacheKey(CacheHelper.GET_LEASING_OFFERS, LEASING_CACHE_SCOPE));
 		CacheHelper.removeCompanyCache(CacheHelper.getCacheKey(CacheHelper.GET_LEASING_RESERVATIONS, LEASING_CACHE_SCOPE));
-		CacheHelper.removeCompanyCache(CacheHelper.getCacheKey(CacheHelper.GET_LEASING_REPORT_SUMMARY, LEASING_CACHE_SCOPE));
 		CacheHelper.clearShortLivedCache();
 	}
 
 	private String availableUnitCacheKey(UnitSearch search) {
 		String value = nullSafe(search.propertyId) + "|" + nullSafe(search.unitType) + "|" + nullSafe(search.bedrooms) + "|" + nullSafe(search.budgetTo);
 		return CacheHelper.getCacheKey(CacheHelper.GET_LEASING_AVAILABLE_UNITS, value);
+	}
+
+	private boolean isVacantUnit(Unit unit) {
+		return unit != null && UNIT_STATUS_VACANT.equals(unit.status);
+	}
+
+	private String normalizeActivityEntityType(String entityType) {
+		String normalized = entityType == null ? "" : entityType.trim().toUpperCase();
+		if (!List.of("LEAD", "PROSPECT", "RESERVATION").contains(normalized)) {
+			throw new IllegalArgumentException("Unsupported activity entity type");
+		}
+		return normalized;
 	}
 
 	private String nullSafe(Object value) {

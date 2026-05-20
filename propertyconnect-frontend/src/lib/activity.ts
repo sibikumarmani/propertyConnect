@@ -3,6 +3,8 @@
 const apiBaseUrl = process.env.NEXT_PUBLIC_PROPERTYCONNECT_API_URL ?? "http://localhost:8080/propertyConnect/api";
 const customerManagementBaseUrl = `${apiBaseUrl}/propertymanagement/customer-management`;
 
+export type ActivityEntityType = "LEAD" | "PROSPECT" | "RESERVATION";
+
 export type StatusHistory = {
   id?: number;
   entityType?: string;
@@ -10,20 +12,12 @@ export type StatusHistory = {
   fromStatus?: string;
   toStatus?: string;
   comments?: string;
+  changedBy?: number;
   changedAt?: string;
 };
 
-export type ReportSummary = {
-  leads: number;
-  qualifiedLeads: number;
-  prospects: number;
-  activeReservations: number;
-  confirmedReservations: number;
-  latestHistory: StatusHistory[];
-};
-
-export async function reportSummary() {
-  return request<ReportSummary>("/reports/summary");
+export async function listActivity(entityType: ActivityEntityType, entityId: number) {
+  return request<StatusHistory[]>(`/activity/${entityType}/${entityId}`);
 }
 
 async function request<T>(path: string): Promise<T> {
@@ -36,7 +30,7 @@ async function request<T>(path: string): Promise<T> {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload?.message ?? "Report request failed.");
+    throw new Error(payload?.message ?? "Customer management request failed.");
   }
   return payload;
 }

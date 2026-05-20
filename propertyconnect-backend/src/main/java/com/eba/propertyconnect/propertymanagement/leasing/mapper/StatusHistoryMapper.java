@@ -13,7 +13,5 @@ public interface StatusHistoryMapper {
 	public int insertHistory(@Param("entityType") String entityType, @Param("entityId") Long entityId, @Param("fromStatus") String fromStatus,
 			@Param("toStatus") String toStatus, @Param("comments") String comments, @Param("changedBy") Long changedBy);
 
-	public List<StatusHistory> latestHistory();
-
-	public long count(@Param("table") String table, @Param("whereClause") String whereClause);
+	public List<StatusHistory> listEntityHistory(@Param("entityType") String entityType, @Param("entityId") Long entityId);
 }

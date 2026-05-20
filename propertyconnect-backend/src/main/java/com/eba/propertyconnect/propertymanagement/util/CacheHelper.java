@@ -22,8 +22,6 @@ public class CacheHelper {
 
 	public static final String GET_LEASING_RESERVATIONS = "getLeasingReservations";
 
-	public static final String GET_LEASING_REPORT_SUMMARY = "getLeasingReportSummary";
-
 	public static final String GET_LEASING_AVAILABLE_UNITS = "getLeasingAvailableUnits";
 
 	private static CacheAccess<Object, Object> companyCache;

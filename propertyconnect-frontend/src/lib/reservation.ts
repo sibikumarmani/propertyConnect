@@ -13,14 +13,21 @@ export type ReservationProspect = {
 export type ReservationOffer = {
   id?: number;
   prospectId?: number;
+  propertyId?: number;
   propertyName?: string;
+  requirementLevel?: number;
+  blockId?: number;
   blockName?: string;
+  floorId?: number;
   floorName?: string;
   unitId?: number;
   offerNo?: string;
   baseAmount?: number;
+  discountAmount?: number;
   finalAmount?: number;
+  specialTerms?: string;
   status?: number;
+  approvalRequired?: boolean;
 };
 
 export type Reservation = {

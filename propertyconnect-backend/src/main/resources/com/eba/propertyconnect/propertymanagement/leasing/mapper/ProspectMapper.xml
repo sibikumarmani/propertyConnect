@@ -5,6 +5,7 @@
 		<id column="id" property="id" jdbcType="BIGINT" />
 		<result column="company_id" property="companyId" jdbcType="BIGINT" />
 		<result column="lead_id" property="leadId" jdbcType="BIGINT" />
+		<result column="lead_no" property="leadNo" jdbcType="VARCHAR" />
 		<result column="prospect_no" property="prospectNo" jdbcType="VARCHAR" />
 		<result column="customer_id" property="customerId" jdbcType="BIGINT" />
 		<result column="customer_code" property="customerCode" jdbcType="VARCHAR" />
@@ -33,14 +34,26 @@
 		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 	<select id="listProspects" resultMap="resultMapProspect">
-		SELECT * FROM pa_txn_leasing_prospect
+		SELECT p.*, l.lead_no
+		FROM pa_txn_leasing_prospect p
+		LEFT JOIN pa_txn_leasing_lead l ON l.id = p.lead_id
 		<where>
-			<if test="companyId != null">company_id = #{companyId}</if>
+			<if test="companyId != null">p.company_id = #{companyId}</if>
 		</where>
-		ORDER BY created_on DESC
+		ORDER BY p.created_on DESC
 	</select>
-	<select id="getProspect" parameterType="long" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect WHERE id = #{id}</select>
-	<select id="getProspectByLead" parameterType="long" resultMap="resultMapProspect">SELECT * FROM pa_txn_leasing_prospect WHERE lead_id = #{leadId}</select>
+	<select id="getProspect" parameterType="long" resultMap="resultMapProspect">
+		SELECT p.*, l.lead_no
+		FROM pa_txn_leasing_prospect p
+		LEFT JOIN pa_txn_leasing_lead l ON l.id = p.lead_id
+		WHERE p.id = #{id}
+	</select>
+	<select id="getProspectByLead" parameterType="long" resultMap="resultMapProspect">
+		SELECT p.*, l.lead_no
+		FROM pa_txn_leasing_prospect p
+		LEFT JOIN pa_txn_leasing_lead l ON l.id = p.lead_id
+		WHERE p.lead_id = #{leadId}
+	</select>
 	<insert id="createProspect" parameterType="com.eba.propertyconnect.propertymanagement.leasing.domain.Prospect">
 		INSERT INTO pa_txn_leasing_prospect (
 			company_id, lead_id, prospect_no, customer_id, customer_code, customer_type, customer_name, trade_license_no, cr_number, vat_registration_no,

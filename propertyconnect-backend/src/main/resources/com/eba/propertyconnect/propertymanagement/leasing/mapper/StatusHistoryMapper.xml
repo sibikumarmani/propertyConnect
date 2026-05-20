@@ -15,9 +15,11 @@
 		INSERT INTO pa_txn_leasing_status_history (entity_type, entity_id, from_status, to_status, comments, changed_by)
 		VALUES (#{entityType}, #{entityId}, #{fromStatus}, #{toStatus}, #{comments}, #{changedBy})
 	</insert>
-	<select id="latestHistory" resultMap="resultMapStatusHistory">SELECT * FROM pa_txn_leasing_status_history ORDER BY changed_at DESC LIMIT 25</select>
-	<select id="count" resultType="long">
-		SELECT COUNT(*) FROM ${table}
-		<if test="whereClause != null">WHERE ${whereClause}</if>
+	<select id="listEntityHistory" resultMap="resultMapStatusHistory">
+		SELECT *
+		FROM pa_txn_leasing_status_history
+		WHERE entity_type = #{entityType}
+		  AND entity_id = #{entityId}
+		ORDER BY changed_at DESC, id DESC
 	</select>
 </mapper>

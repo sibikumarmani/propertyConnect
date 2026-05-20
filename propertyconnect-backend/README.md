@@ -43,7 +43,6 @@ POST /api/propertymanagement/crm-leasing/reservations/{id}/approval
 POST /api/propertymanagement/crm-leasing/reservations/{id}/payment
 POST /api/propertymanagement/crm-leasing/reservations/{id}/confirm
 POST /api/propertymanagement/crm-leasing/reservations/{id}/move-to-lease
-GET /api/propertymanagement/crm-leasing/reports/summary
 ```
 
 ## CRM Leasing Database

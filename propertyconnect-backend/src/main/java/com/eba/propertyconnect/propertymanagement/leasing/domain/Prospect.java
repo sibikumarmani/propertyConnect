@@ -5,6 +5,7 @@ public class Prospect extends AuditModel {
 	public Long id;
 	public Long companyId;
 	public Long leadId;
+	public String leadNo;
 	public String prospectNo;
 	public Long customerId;
 	public String customerCode;

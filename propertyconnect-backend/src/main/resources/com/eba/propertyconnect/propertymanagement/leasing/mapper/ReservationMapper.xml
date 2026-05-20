@@ -69,4 +69,10 @@
 		AND status IN
 		<foreach collection="statuses" item="status" open="(" separator="," close=")">#{status}</foreach>
 	</select>
+	<select id="hasReservationForOffer" resultType="boolean">
+		SELECT COUNT(*) > 0
+		FROM pa_txn_leasing_reservation
+		WHERE offer_id = #{offerId}
+		<if test="excludeReservationId != null">AND id != #{excludeReservationId}</if>
+	</select>
 </mapper>

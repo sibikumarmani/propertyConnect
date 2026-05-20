@@ -24,7 +24,8 @@
 	<select id="searchAvailableUnits" resultMap="resultMapUnit">
 		SELECT * FROM pa_mst_unit
 		<trim prefix="WHERE" prefixOverrides="AND|OR">
-			status = 'AVAILABLE'
+			status = #{availableStatus}
+			AND active_status = 'Y'
 			<if test="propertyId != null">AND property_id = #{propertyId}</if>
 			<if test="unitType != null">AND unit_type = #{unitType}</if>
 			<if test="bedrooms != null">AND bedrooms = #{bedrooms}</if>

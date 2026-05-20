@@ -3,7 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BadgeCheck, Edit3, Loader2, Plus, RefreshCcw, Save, Search, Send, UserCheck, UserPlus, UsersRound, X, type LucideIcon } from "lucide-react";
 
+import { ActivityTimeline } from "@/components/customer-management/activity-timeline";
 import { WorkspaceDrawer } from "@/components/layout/workspace-drawer";
+import { listActivity, type StatusHistory } from "@/lib/activity";
 import { convertLeadToProspect, createLead, listCodeValues, listLeads, qualifyLead, searchCustomers, updateLead, type BusinessParty, type ErpCodeValue, type Lead, type LeadStageTarget } from "@/lib/lead";
 import { listProspects, type Prospect } from "@/lib/prospect";
 
@@ -39,6 +41,7 @@ type LeadBoardProps = {
   loading: boolean;
   saving: boolean;
   selectedLead: Lead | null;
+  selectedLeadActivity: StatusHistory[];
   selectedLeadProspect: Prospect | null;
   stageLead: Lead | null;
   stageNotes: string;
@@ -127,6 +130,8 @@ const leadScreenMeta: Record<LeadScreen, { title: string; subtitle: string; icon
   leads: { title: "Lead List", subtitle: "Track leasing enquiries and their conversion status.", icon: UsersRound },
   "lead-entry": { title: "Lead Entry", subtitle: "Capture a new leasing enquiry with source and contact details.", icon: UserPlus },
 };
+const leadDetailTabs = ["DETAIL", "ACTIVITY"] as const;
+type LeadDetailTab = (typeof leadDetailTabs)[number];
 
 export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -150,6 +155,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
   const [leadStatusFilter, setLeadStatusFilter] = useState("ALL");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [selectedLeadActivity, setSelectedLeadActivity] = useState<StatusHistory[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -236,6 +242,27 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedLead?.id) {
+      return;
+    }
+    listActivity("LEAD", selectedLead.id)
+      .then((items) => {
+        if (active) {
+          setSelectedLeadActivity(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSelectedLeadActivity([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedLead?.id]);
 
   async function run(action: () => Promise<unknown>, success: string) {
     setSaving(true);
@@ -406,6 +433,7 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
           loading={loading}
           saving={saving}
           selectedLead={selectedLead}
+          selectedLeadActivity={selectedLeadActivity}
           selectedLeadProspect={selectedLeadProspect}
           stageLead={stageLead}
           stageNotes={stageNotes}
@@ -427,7 +455,10 @@ export function LeadWorkspace({ screen }: { screen: LeadScreen }) {
           onNotesChange={setStageNotes}
           onProspectDetailsChange={setStageProspectDetails}
           onScoreChange={setStageScore}
-          onSelectLead={(lead) => setSelectedLeadId(lead.id ?? null)}
+          onSelectLead={(lead) => {
+            setSelectedLeadId(lead.id ?? null);
+            setSelectedLeadActivity([]);
+          }}
           onSubmitLead={submitLead}
           onSubmitStage={submitStageMove}
           onTargetChange={setStageTarget}
@@ -485,6 +516,7 @@ function LeadBoard({
   loading,
   saving,
   selectedLead,
+  selectedLeadActivity,
   selectedLeadProspect,
   stageLead,
   stageNotes,
@@ -530,7 +562,7 @@ function LeadBoard({
         })}
       </div>
 
-      <div className="grid gap-4 px-4 pb-6 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)] xl:px-6">
+      <div className="grid gap-4 px-4 pb-6 xl:grid-cols-[minmax(280px,0.6fr)_minmax(0,1.4fr)] xl:px-6">
         <section className="panel overflow-hidden rounded-lg">
           <div className="border-b border-[color:var(--line)] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand)]">Lead options</p>
@@ -605,7 +637,7 @@ function LeadBoard({
           </div>
         </section>
 
-        <LeadDetailPanel lead={selectedLead} prospect={selectedLeadProspect} preferredContactOptions={preferredContactOptions} leadPurposeOptions={leadPurposeOptions} leadStatusOptions={leadStatusOptions} onEditLead={onEditLead} onMoveStage={onMoveStage} />
+        <LeadDetailPanel lead={selectedLead} activity={selectedLeadActivity} prospect={selectedLeadProspect} preferredContactOptions={preferredContactOptions} leadPurposeOptions={leadPurposeOptions} leadStatusOptions={leadStatusOptions} onEditLead={onEditLead} onMoveStage={onMoveStage} />
       </div>
 
       <WorkspaceDrawer eyebrow="Lead" open={leadDrawerMode !== null} title={leadDrawerMode === "edit" ? "Edit lead" : "Create lead"} onClose={onCloseLeadDrawer}>
@@ -657,7 +689,9 @@ function LeadBoard({
   );
 }
 
-function LeadDetailPanel({ lead, prospect, preferredContactOptions, leadPurposeOptions, leadStatusOptions, onEditLead, onMoveStage }: { lead: Lead | null; prospect: Prospect | null; preferredContactOptions: ErpCodeValue[]; leadPurposeOptions: ErpCodeValue[]; leadStatusOptions: ErpCodeValue[]; onEditLead: (lead: Lead) => void; onMoveStage: (lead: Lead) => void }) {
+function LeadDetailPanel({ lead, activity, prospect, preferredContactOptions, leadPurposeOptions, leadStatusOptions, onEditLead, onMoveStage }: { lead: Lead | null; activity: StatusHistory[]; prospect: Prospect | null; preferredContactOptions: ErpCodeValue[]; leadPurposeOptions: ErpCodeValue[]; leadStatusOptions: ErpCodeValue[]; onEditLead: (lead: Lead) => void; onMoveStage: (lead: Lead) => void }) {
+  const [activeTab, setActiveTab] = useState<LeadDetailTab>("DETAIL");
+
   if (!lead) {
     return (
       <section className="panel rounded-lg p-6">
@@ -695,41 +729,74 @@ function LeadDetailPanel({ lead, prospect, preferredContactOptions, leadPurposeO
         </div>
       </div>
 
-      <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-        <DetailItem label="Mobile no" value={lead.mobileNo} />
-        <DetailItem label="Customer code" value={lead.customerCode} />
-        <DetailItem label="Customer type" value={lead.customerTypeName} />
-        <DetailItem label="Contact person name" value={lead.contactPerson} />
-        <DetailItem label="Email" value={lead.email} />
-        <DetailItem label="Preferred contact" value={codeValueLabel(preferredContactOptions, lead.preferredContactMethod)} />
-        <DetailItem label="Purpose" value={codeValueLabel(leadPurposeOptions, lead.purpose)} />
-        <DetailItem label="Qualification score" value={lead.qualificationScore === undefined ? undefined : String(lead.qualificationScore)} />
-        <DetailItem label="Prospect no" value={prospect?.prospectNo} />
-      </div>
-
-      <div className="border-t border-[color:var(--line)] p-5 sm:p-6">
-        <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Qualification notes</h3>
-        <p className="mt-3 min-h-24 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4 text-sm leading-6 text-[color:var(--foreground-muted)]">
-          {lead.qualificationNotes || "No qualification notes captured yet."}
-        </p>
-      </div>
-
-      <div className="border-t border-[color:var(--line)] p-5 sm:p-6">
-        <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Pipeline stage</h3>
-        <div className="mt-4 grid gap-3 sm:grid-cols-4">
-          {["Lead", "Qualified", "Prospect"].map((stage) => {
-            const reached = isStageReached(stage, lead, prospect, leadStatusOptions);
-
-            return (
-              <div className="rounded-lg border p-3" key={stage} style={{ borderColor: reached ? "var(--brand-border)" : "var(--line)", background: reached ? "var(--brand-tint)" : "var(--surface-raised)" }}>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: reached ? "var(--brand)" : "var(--foreground-subtle)" }}>
-                  {stage}
-                </p>
-              </div>
-            );
-          })}
+      <div className="border-b border-[color:var(--line)] px-5 py-3 sm:px-6">
+        <div className="flex gap-2 overflow-x-auto">
+          {leadDetailTabs.map((tab) => (
+            <button
+              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition"
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                background: activeTab === tab ? "var(--brand-tint)" : "transparent",
+                color: activeTab === tab ? "var(--brand)" : "var(--foreground-muted)",
+                border: `1px solid ${activeTab === tab ? "var(--brand-border)" : "transparent"}`,
+              }}
+              type="button"
+            >
+              {leadTabLabel(tab)}
+            </button>
+          ))}
         </div>
       </div>
+
+      {activeTab === "DETAIL" ? (
+        <div className="p-5 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DetailItem label="Mobile no" value={lead.mobileNo} />
+            <DetailItem label="Customer code" value={lead.customerCode} />
+            <DetailItem label="Customer type" value={lead.customerTypeName} />
+            <DetailItem label="Contact person name" value={lead.contactPerson} />
+            <DetailItem label="Email" value={lead.email} />
+            <DetailItem label="Preferred contact" value={codeValueLabel(preferredContactOptions, lead.preferredContactMethod)} />
+            <DetailItem label="Purpose" value={codeValueLabel(leadPurposeOptions, lead.purpose)} />
+            <DetailItem label="Qualification score" value={lead.qualificationScore === undefined ? undefined : String(lead.qualificationScore)} />
+            <DetailItem label="Prospect no" value={prospect?.prospectNo} />
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Qualification notes</h3>
+            <p className="mt-3 min-h-24 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4 text-sm leading-6 text-[color:var(--foreground-muted)]">
+              {lead.qualificationNotes || "No qualification notes captured yet."}
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Pipeline stage</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              {["Lead", "Qualified", "Prospect"].map((stage) => {
+                const reached = isStageReached(stage, lead, prospect, leadStatusOptions);
+
+                return (
+                  <div className="rounded-lg border p-3" key={stage} style={{ borderColor: reached ? "var(--brand-border)" : "var(--line)", background: reached ? "var(--brand-tint)" : "var(--surface-raised)" }}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: reached ? "var(--brand)" : "var(--foreground-subtle)" }}>
+                      {stage}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "ACTIVITY" ? (
+      <div className="p-5 sm:p-6">
+        <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Activity</h3>
+        <div className="mt-4">
+          <ActivityTimeline activity={activity} />
+        </div>
+      </div>
+      ) : null}
     </section>
   );
 }
@@ -1143,6 +1210,14 @@ function leadStatusKey(lead: Lead, options: ErpCodeValue[]) {
 
 function isLeadListStatusKey(value: string): value is (typeof leadListStatusKeys)[number] {
   return leadListStatusKeys.some((status) => status === value);
+}
+
+function leadTabLabel(tab: LeadDetailTab) {
+  const labels: Record<LeadDetailTab, string> = {
+    DETAIL: "Detail",
+    ACTIVITY: "Activity",
+  };
+  return labels[tab];
 }
 
 function leadStatusIdByKey(options: ErpCodeValue[], key: LeadStageTarget | "NEW") {

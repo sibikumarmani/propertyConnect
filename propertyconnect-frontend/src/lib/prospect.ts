@@ -7,6 +7,7 @@ export type Prospect = {
   id?: number;
   companyId?: number;
   leadId?: number;
+  leadNo?: string;
   prospectNo?: string;
   customerId?: number;
   customerCode?: string;
@@ -159,6 +160,17 @@ export type ProspectPaymentReceipt = {
   createdOn?: string;
 };
 
+export type AvailableUnit = {
+  id?: number;
+  propertyId?: number;
+  propertyName?: string;
+  unitCode?: string;
+  unitType?: string;
+  bedrooms?: number;
+  askingRent?: number;
+  status?: string;
+};
+
 export async function listProspects() {
   const companyId = selectedCompanyId();
   return request<Prospect[]>(`/prospects${companyId ? `?companyId=${companyId}` : ""}`);
@@ -204,6 +216,10 @@ export async function listReservations() {
 export async function listOffers() {
   const companyId = selectedCompanyId();
   return request<ProspectOffer[]>(`/offers${companyId ? `?companyId=${companyId}` : ""}`);
+}
+
+export async function searchAvailableUnits(payload: { propertyId?: number; unitType?: string; bedrooms?: number; budgetTo?: number }) {
+  return request<AvailableUnit[]>("/units/search", { method: "POST", body: payload });
 }
 
 export async function saveProspectOffer(payload: ProspectOffer) {

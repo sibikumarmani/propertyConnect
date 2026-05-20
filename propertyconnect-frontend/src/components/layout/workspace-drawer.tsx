@@ -16,7 +16,7 @@ export function WorkspaceDrawer({ children, eyebrow, open, title, onClose }: Wor
   return (
     <div className="fixed inset-0 z-50">
       <button aria-label="Close drawer" className="overlay-scrim absolute inset-0 h-full w-full" onClick={onClose} type="button" />
-      <aside className="page-surface absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-[color:var(--line-strong)] shadow-[-24px_0_80px_rgba(15,23,42,0.18)]">
+      <aside className="page-surface absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-[color:var(--line-strong)] shadow-[-24px_0_80px_rgba(15,23,42,0.18)]">
         <div className="border-b border-[color:var(--line)] p-5 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">{eyebrow}</p>
           <div className="mt-2 flex items-center justify-between gap-4">

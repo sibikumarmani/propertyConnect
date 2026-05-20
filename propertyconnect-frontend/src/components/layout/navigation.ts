@@ -48,7 +48,6 @@ export const navigationGroups: NavigationGroup[] = [
       { href: "/propertyconnect/customer-management/leads", label: "Lead", icon: UserPlus },
       { href: "/propertyconnect/customer-management/prospects", label: "Prospect", icon: UserCheck },
       { href: "/propertyconnect/customer-management/reservations", label: "Reservation", icon: ClipboardList },
-      { href: "/propertyconnect/customer-management/reports", label: "Reports", icon: BarChart3 },
     ],
   },
   {

@@ -3,7 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Edit3, Loader2, Plus, RefreshCcw, Save, Search, UserCheck } from "lucide-react";
 
+import { ActivityTimeline } from "@/components/customer-management/activity-timeline";
 import { WorkspaceDrawer } from "@/components/layout/workspace-drawer";
+import { listActivity, type StatusHistory } from "@/lib/activity";
 import { listCodeValues, type ErpCodeValue } from "@/lib/lead";
 import { listBlocks, listFloors, listProperties, listUnits, type MasterRecord, type PropertyMaster } from "@/lib/property-management";
 import {
@@ -25,6 +27,7 @@ import {
   saveProspectReservation,
   saveProspectRequirement,
   saveProspectSiteVisit,
+  searchAvailableUnits,
   updateProspect,
   updateProspectOffer,
   updateProspectOfferStatus,
@@ -32,6 +35,7 @@ import {
   updateProspectReservation,
   updateProspectReservationStatus,
   updateProspectSiteVisit,
+  type AvailableUnit,
   type Prospect,
   type ProspectNegotiation,
   type ProspectOffer,
@@ -57,7 +61,9 @@ type ProspectBoardProps = {
   prospectStatusFilter: string;
   prospectStatuses: string[];
   requirements: ProspectRequirement[];
+  availableUnits: AvailableUnit[];
   offers: ProspectOffer[];
+  prospectActivity: StatusHistory[];
   preferredContactOptions: ErpCodeValue[];
   leadSourceOptions: ErpCodeValue[];
   leadPurposeOptions: ErpCodeValue[];
@@ -68,6 +74,7 @@ type ProspectBoardProps = {
   unitTypeOptions: ErpCodeValue[];
   selectedProspect: Prospect | null;
   siteVisits: ProspectSiteVisit[];
+  searchingRequirementId?: number;
   onProspectSearchChange: (value: string) => void;
   onProspectStatusFilterChange: (value: string) => void;
   onCreateRequirement: () => void;
@@ -80,6 +87,7 @@ type ProspectBoardProps = {
   onSelectProspect: (prospect: Prospect) => void;
   onSelectRequirement: (requirement: ProspectRequirement) => void;
   onSelectSiteVisit: (siteVisit: ProspectSiteVisit) => void;
+  onSearchAvailableUnits: (requirement: ProspectRequirement) => void;
 };
 
 type RequirementForm = {
@@ -288,6 +296,8 @@ const prospectScreenMeta: Record<ProspectScreen, { title: string; subtitle: stri
 };
 
 const prospectStageStatuses = ["PROSPECT", "REQUIREMENT_CAPTURED", "SITE_VISIT_SCHEDULED", "OFFER_IN_PROGRESS", "NEGOTIATION_IN_PROGRESS", "RESERVATION_IN_PROGRESS"];
+const prospectDetailTabs = ["DETAIL", "REQUIREMENT", "AVAILABLE_UNITS", "SITE_VISIT", "OFFER", "ACTIVITY"] as const;
+type ProspectDetailTab = (typeof prospectDetailTabs)[number];
 
 export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -304,8 +314,11 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
   const [prospectStatusFilter, setProspectStatusFilter] = useState("ALL");
   const [selectedProspectId, setSelectedProspectId] = useState<number | null>(null);
   const [requirements, setRequirements] = useState<ProspectRequirement[]>([]);
+  const [availableUnits, setAvailableUnits] = useState<AvailableUnit[]>([]);
   const [siteVisits, setSiteVisits] = useState<ProspectSiteVisit[]>([]);
   const [offers, setOffers] = useState<ProspectOffer[]>([]);
+  const [selectedProspectActivity, setSelectedProspectActivity] = useState<StatusHistory[]>([]);
+  const [searchingRequirementId, setSearchingRequirementId] = useState<number | undefined>(undefined);
   const [requirementForm, setRequirementForm] = useState<RequirementForm>(initialRequirementForm);
   const [siteVisitForm, setSiteVisitForm] = useState<SiteVisitForm>(initialSiteVisitForm);
   const [offerForm, setOfferForm] = useState<OfferForm>(initialOfferForm);
@@ -488,6 +501,27 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
     return () => window.clearTimeout(timer);
   }, [loadRequirements, selectedProspect?.id]);
 
+  useEffect(() => {
+    let active = true;
+    if (!selectedProspect?.id) {
+      return;
+    }
+    listActivity("PROSPECT", selectedProspect.id)
+      .then((items) => {
+        if (active) {
+          setSelectedProspectActivity(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSelectedProspectActivity([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedProspect?.id]);
+
   async function submitProspect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prospectForm.id) {
@@ -630,6 +664,28 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
     setRequirementDrawerOpen(true);
   }
 
+  async function searchUnitsForRequirement(requirement: ProspectRequirement) {
+    setSearchingRequirementId(requirement.id);
+    setError("");
+    setMessage("");
+    try {
+      const unitTypeLabel = codeValueLabel(unitTypeOptions, requirement.unitType);
+      const units = await searchAvailableUnits({
+        propertyId: requirement.propertyId,
+        unitType: unitTypeLabel,
+        bedrooms: requirement.bedrooms,
+        budgetTo: requirement.budgetTo,
+      });
+      setAvailableUnits(units);
+      setMessage(units.length === 0 ? "No available units found for this requirement." : `${units.length} available unit${units.length === 1 ? "" : "s"} found.`);
+    } catch (actionError) {
+      setAvailableUnits([]);
+      setError(actionError instanceof Error ? actionError.message : "Unable to search available units.");
+    } finally {
+      setSearchingRequirementId(undefined);
+    }
+  }
+
   function openNewSiteVisit() {
     setSiteVisitForm(initialSiteVisitFormForRequirements(requirements));
     setSiteVisitDrawerOpen(true);
@@ -733,7 +789,9 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         prospectStatusFilter={prospectStatusFilter}
         prospectStatuses={prospectStatuses}
         requirements={requirements}
+        availableUnits={availableUnits}
         offers={offers}
+        prospectActivity={selectedProspectActivity}
         preferredContactOptions={preferredContactOptions}
         leadSourceOptions={leadSourceOptions}
         leadPurposeOptions={leadPurposeOptions}
@@ -744,6 +802,7 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         unitTypeOptions={unitTypeOptions}
         selectedProspect={selectedProspect}
         siteVisits={siteVisits}
+        searchingRequirementId={searchingRequirementId}
         onProspectSearchChange={setProspectSearch}
         onProspectStatusFilterChange={setProspectStatusFilter}
         onCreateRequirement={openNewRequirement}
@@ -753,9 +812,15 @@ export function ProspectWorkspace({ screen }: { screen: ProspectScreen }) {
         onEditProspect={openEditProspect}
         onViewOffer={openViewOffer}
         onSelectOffer={openEditOffer}
-        onSelectProspect={(prospect) => setSelectedProspectId(prospect.id ?? null)}
+        onSelectProspect={(prospect) => {
+          setSelectedProspectId(prospect.id ?? null);
+          setSelectedProspectActivity([]);
+          setAvailableUnits([]);
+          setSearchingRequirementId(undefined);
+        }}
         onSelectRequirement={openEditRequirement}
         onSelectSiteVisit={openEditSiteVisit}
+        onSearchAvailableUnits={searchUnitsForRequirement}
       />
 
       <WorkspaceDrawer
@@ -1187,7 +1252,9 @@ function ProspectBoard({
   prospectStatusFilter,
   prospectStatuses,
   requirements,
+  availableUnits,
   offers,
+  prospectActivity,
   preferredContactOptions,
   leadSourceOptions,
   leadPurposeOptions,
@@ -1198,6 +1265,7 @@ function ProspectBoard({
   unitTypeOptions,
   selectedProspect,
   siteVisits,
+  searchingRequirementId,
   onProspectSearchChange,
   onProspectStatusFilterChange,
   onCreateRequirement,
@@ -1210,6 +1278,7 @@ function ProspectBoard({
   onSelectProspect,
   onSelectRequirement,
   onSelectSiteVisit,
+  onSearchAvailableUnits,
 }: ProspectBoardProps) {
   return (
     <>
@@ -1223,7 +1292,7 @@ function ProspectBoard({
         ))}
       </div>
 
-      <div className="grid gap-4 px-4 pb-6 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)] xl:px-6">
+      <div className="grid gap-4 px-4 pb-6 xl:grid-cols-[minmax(280px,0.6fr)_minmax(0,1.4fr)] xl:px-6">
         <section className="panel overflow-hidden rounded-lg">
           <div className="border-b border-[color:var(--line)] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand)]">Prospect options</p>
@@ -1296,7 +1365,9 @@ function ProspectBoard({
         <ProspectDetailPanel
           prospect={selectedProspect}
           requirements={requirements}
+          availableUnits={availableUnits}
           offers={offers}
+          prospectActivity={prospectActivity}
           siteVisits={siteVisits}
           leadSourceOptions={leadSourceOptions}
           leadPurposeOptions={leadPurposeOptions}
@@ -1305,6 +1376,7 @@ function ProspectBoard({
           requirementLevelOptions={requirementLevelOptions}
           siteVisitStatusOptions={siteVisitStatusOptions}
           unitTypeOptions={unitTypeOptions}
+          searchingRequirementId={searchingRequirementId}
           onCreateRequirement={onCreateRequirement}
           onCreateOffer={onCreateOffer}
           onCreateSiteVisit={onCreateSiteVisit}
@@ -1314,6 +1386,7 @@ function ProspectBoard({
           onSelectOffer={onSelectOffer}
           onSelectRequirement={onSelectRequirement}
           onSelectSiteVisit={onSelectSiteVisit}
+          onSearchAvailableUnits={onSearchAvailableUnits}
         />
       </div>
     </>
@@ -1323,7 +1396,9 @@ function ProspectBoard({
 function ProspectDetailPanel({
   prospect,
   requirements,
+  availableUnits,
   offers,
+  prospectActivity,
   siteVisits,
   leadPurposeOptions,
   leadSourceOptions,
@@ -1332,6 +1407,7 @@ function ProspectDetailPanel({
   requirementLevelOptions,
   siteVisitStatusOptions,
   unitTypeOptions,
+  searchingRequirementId,
   onCreateRequirement,
   onCreateOffer,
   onCreateSiteVisit,
@@ -1341,10 +1417,13 @@ function ProspectDetailPanel({
   onSelectOffer,
   onSelectRequirement,
   onSelectSiteVisit,
+  onSearchAvailableUnits,
 }: {
   prospect: Prospect | null;
   requirements: ProspectRequirement[];
+  availableUnits: AvailableUnit[];
   offers: ProspectOffer[];
+  prospectActivity: StatusHistory[];
   siteVisits: ProspectSiteVisit[];
   leadPurposeOptions: ErpCodeValue[];
   leadSourceOptions: ErpCodeValue[];
@@ -1353,6 +1432,7 @@ function ProspectDetailPanel({
   requirementLevelOptions: ErpCodeValue[];
   siteVisitStatusOptions: ErpCodeValue[];
   unitTypeOptions: ErpCodeValue[];
+  searchingRequirementId?: number;
   onCreateRequirement: () => void;
   onCreateOffer: () => void;
   onCreateSiteVisit: () => void;
@@ -1362,7 +1442,10 @@ function ProspectDetailPanel({
   onSelectOffer: (offer: ProspectOffer) => void;
   onSelectRequirement: (requirement: ProspectRequirement) => void;
   onSelectSiteVisit: (siteVisit: ProspectSiteVisit) => void;
+  onSearchAvailableUnits: (requirement: ProspectRequirement) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<ProspectDetailTab>("DETAIL");
+
   if (!prospect) {
     return (
       <section className="panel rounded-lg p-6">
@@ -1390,37 +1473,60 @@ function ProspectDetailPanel({
         </div>
       </div>
 
-      <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-        <DetailItem label="Customer code" value={prospect.customerCode} />
-        <DetailItem label="Customer type" value={prospect.customerTypeName} />
-        <DetailItem label="Trade license no" value={prospect.tradeLicenseNo} />
-        <DetailItem label="CR number" value={prospect.crNumber} />
-        <DetailItem label="VAT registration no" value={prospect.vatRegistrationNo} />
-        <DetailItem label="Contact person" value={prospect.contactPerson} />
-        <DetailItem label="Contact role" value={prospect.contactRole} />
-        <DetailItem label="Contact title" value={prospect.contactTitle} />
-        <DetailItem label="Mobile no" value={prospect.mobileNo} />
-        <DetailItem label="Phone no" value={prospect.phoneNo} />
-        <DetailItem label="Email" value={prospect.email} />
-        <DetailItem label="Fax no" value={prospect.faxNo} />
-        <DetailItem label="Address" value={prospect.address} />
-        <DetailItem label="Source" value={codeValueLabel(leadSourceOptions, prospect.source)} />
-        <DetailItem label="Purpose" value={codeValueLabel(leadPurposeOptions, prospect.purpose)} />
-        <DetailItem label="Commercial need" value={prospect.commercialNeed} />
-        <DetailItem label="Company id" value={prospect.companyId === undefined ? undefined : String(prospect.companyId)} />
-        <DetailItem label="Lead id" value={prospect.leadId === undefined ? undefined : String(prospect.leadId)} />
-        <DetailItem label="Status" value={codeValueLabel(prospectStatusOptions, prospect.status)} />
-        <DetailItem label="Created by" value={prospect.createdBy === undefined ? undefined : String(prospect.createdBy)} />
+      <div className="border-b border-[color:var(--line)] px-5 py-3 sm:px-6">
+        <div className="flex gap-2 overflow-x-auto">
+          {prospectDetailTabs.map((tab) => (
+            <button
+              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition"
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                background: activeTab === tab ? "var(--brand-tint)" : "transparent",
+                color: activeTab === tab ? "var(--brand)" : "var(--foreground-muted)",
+                border: `1px solid ${activeTab === tab ? "var(--brand-border)" : "transparent"}`,
+              }}
+              type="button"
+            >
+              {prospectTabLabel(tab)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="border-t border-[color:var(--line)] p-5 sm:p-6">
-        <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Document notes</h3>
-        <p className="mt-3 min-h-20 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4 text-sm leading-6 text-[color:var(--foreground-muted)]">
-          {prospect.documentNotes || "No customer document notes captured yet."}
-        </p>
-      </div>
+      {activeTab === "DETAIL" ? (
+        <div className="p-5 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DetailItem label="Customer code" value={prospect.customerCode} />
+            <DetailItem label="Customer type" value={prospect.customerTypeName} />
+            <DetailItem label="Trade license no" value={prospect.tradeLicenseNo} />
+            <DetailItem label="CR number" value={prospect.crNumber} />
+            <DetailItem label="VAT registration no" value={prospect.vatRegistrationNo} />
+            <DetailItem label="Contact person" value={prospect.contactPerson} />
+            <DetailItem label="Contact role" value={prospect.contactRole} />
+            <DetailItem label="Contact title" value={prospect.contactTitle} />
+            <DetailItem label="Mobile no" value={prospect.mobileNo} />
+            <DetailItem label="Phone no" value={prospect.phoneNo} />
+            <DetailItem label="Email" value={prospect.email} />
+            <DetailItem label="Fax no" value={prospect.faxNo} />
+            <DetailItem label="Address" value={prospect.address} />
+            <DetailItem label="Source" value={codeValueLabel(leadSourceOptions, prospect.source)} />
+            <DetailItem label="Purpose" value={codeValueLabel(leadPurposeOptions, prospect.purpose)} />
+            <DetailItem label="Commercial need" value={prospect.commercialNeed} />
+            <DetailItem label="Lead no" value={prospect.leadNo} />
+            <DetailItem label="Status" value={codeValueLabel(prospectStatusOptions, prospect.status)} />
+            <DetailItem label="Created by" value={prospect.createdBy === undefined ? undefined : String(prospect.createdBy)} />
+          </div>
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Document notes</h3>
+            <p className="mt-3 min-h-20 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4 text-sm leading-6 text-[color:var(--foreground-muted)]">
+              {prospect.documentNotes || "No customer document notes captured yet."}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
-      <div className="border-t border-[color:var(--line)] p-5 sm:p-6">
+      {activeTab === "REQUIREMENT" ? (
+      <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Requirements</h3>
           <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold" onClick={onCreateRequirement} type="button">
@@ -1432,27 +1538,51 @@ function ProspectDetailPanel({
         <div className="mt-4 grid gap-3">
           {requirements.length === 0 ? <p className="rounded-lg border border-[color:var(--line)] p-4 text-sm text-[color:var(--foreground-muted)]">No requirements captured yet.</p> : null}
           {requirements.map((requirement) => (
-            <button
-              className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-4 text-left transition hover:border-[color:var(--brand-border)] hover:bg-[color:var(--brand-tint)]"
+            <div
+              className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-4"
               key={requirement.id ?? `${requirement.prospectId}-${requirement.propertyName}`}
-              onClick={() => onSelectRequirement(requirement)}
-              type="button"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <button className="min-w-0 flex-1 text-left" onClick={() => onSelectRequirement(requirement)} type="button">
                   <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{requirement.propertyName || codeValueLabel(unitTypeOptions, requirement.unitType) || "Requirement"}</p>
                   <p className="mt-1 text-sm text-[color:var(--foreground-muted)]">
                     {formatRequirementSummary(requirement, requirementLevelOptions, unitTypeOptions)}
                   </p>
+                </button>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold" onClick={() => onSelectRequirement(requirement)} type="button">
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                  <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={searchingRequirementId === requirement.id} onClick={() => onSearchAvailableUnits(requirement)} type="button">
+                    {searchingRequirementId === requirement.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                    Units
+                  </button>
                 </div>
-                <Edit3 className="h-4 w-4 shrink-0 text-[color:var(--brand)]" />
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>
+      ) : null}
 
-      <div className="border-t border-[color:var(--line)] p-5 sm:p-6">
+      {activeTab === "AVAILABLE_UNITS" ? (
+        <div className="p-5 sm:p-6">
+          <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Available units</h3>
+          <div className="mt-4 grid gap-3">
+            {availableUnits.length === 0 ? <p className="rounded-lg border border-[color:var(--line)] p-4 text-sm text-[color:var(--foreground-muted)]">No available units loaded for this prospect.</p> : null}
+            {availableUnits.map((unit) => (
+              <div className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-4 text-sm" key={unit.id ?? unit.unitCode}>
+                <p className="font-semibold text-[color:var(--brand-strong)]">{unit.unitCode || `Unit ${unit.id ?? "-"}`}</p>
+                <p className="mt-1 text-[color:var(--foreground-muted)]">{formatAvailableUnit(unit)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "SITE_VISIT" ? (
+      <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Site visits</h3>
           <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold" onClick={onCreateSiteVisit} type="button">
@@ -1483,8 +1613,10 @@ function ProspectDetailPanel({
           ))}
         </div>
       </div>
+      ) : null}
 
-      <div className="border-t border-[color:var(--line)] p-5 sm:p-6">
+      {activeTab === "OFFER" ? (
+      <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Offers</h3>
           <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold" onClick={onCreateOffer} type="button">
@@ -1561,6 +1693,16 @@ function ProspectDetailPanel({
           })}
         </div>
       </div>
+      ) : null}
+
+      {activeTab === "ACTIVITY" ? (
+      <div className="p-5 sm:p-6">
+        <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Activity</h3>
+        <div className="mt-4">
+          <ActivityTimeline activity={prospectActivity} />
+        </div>
+      </div>
+      ) : null}
 
     </section>
   );
@@ -2754,6 +2896,22 @@ function formatRequirementSummary(requirement: ProspectRequirement, requirementL
   const budget = requirement.budgetFrom || requirement.budgetTo ? `${requirement.budgetFrom ?? "-"} to ${requirement.budgetTo ?? "-"}` : "Budget pending";
   const area = requirement.areaFrom || requirement.areaTo ? `Area ${requirement.areaFrom ?? "-"} to ${requirement.areaTo ?? "-"}` : undefined;
   return [codeValueLabel(requirementLevelOptions, requirement.requirementLevel), codeValueLabel(unitTypeOptions, requirement.unitType), area, budget, requirement.moveInDate].filter(Boolean).join(" | ");
+}
+
+function prospectTabLabel(tab: ProspectDetailTab) {
+  const labels: Record<ProspectDetailTab, string> = {
+    DETAIL: "Detail",
+    REQUIREMENT: "Requirement",
+    AVAILABLE_UNITS: "Available units",
+    SITE_VISIT: "Site Visit",
+    OFFER: "Offer",
+    ACTIVITY: "Activity",
+  };
+  return labels[tab];
+}
+
+function formatAvailableUnit(unit: AvailableUnit) {
+  return [propertyDisplayName(unit.propertyName), unit.unitType, unit.bedrooms === undefined ? undefined : `${unit.bedrooms} BR`, unit.askingRent === undefined ? undefined : `Rent ${unit.askingRent}`, unit.status].filter(Boolean).join(" | ");
 }
 
 function formatSiteVisitSummary(siteVisit: ProspectSiteVisit, requirementLevelOptions: ErpCodeValue[], siteVisitStatusOptions: ErpCodeValue[]) {

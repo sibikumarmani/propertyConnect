@@ -3,7 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Edit3, Loader2, Plus, RefreshCcw, Save, Search, UserCheck } from "lucide-react";
 
+import { ActivityTimeline } from "@/components/customer-management/activity-timeline";
 import { WorkspaceDrawer } from "@/components/layout/workspace-drawer";
+import { listActivity, type StatusHistory } from "@/lib/activity";
 import { listCodeValues, type ErpCodeValue } from "@/lib/lead";
 import {
   approveReservation,
@@ -25,6 +27,11 @@ import {
 } from "@/lib/reservation";
 
 type ReservationAction = "submit" | "approve" | "reject" | "payment" | "confirm" | "cancel" | "expire" | "move";
+type ReservationDetailTab = "DETAIL" | "ACTIVITY";
+type ReservationStatusAction = {
+  action: ReservationAction;
+  label: string;
+};
 
 type ReservationForm = {
   id?: number;
@@ -66,7 +73,8 @@ export function ReservationWorkspace() {
   const [decisionOptions, setDecisionOptions] = useState<ErpCodeValue[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [reservationForm, setReservationForm] = useState<ReservationForm>(initialReservationForm);
-  const [reservationView, setReservationView] = useState<Reservation | null>(null);
+  const [selectedReservationId, setSelectedReservationId] = useState<number | null>(null);
+  const [selectedReservationActivity, setSelectedReservationActivity] = useState<StatusHistory[]>([]);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(initialPaymentForm);
   const [reservationDrawerOpen, setReservationDrawerOpen] = useState(false);
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false);
@@ -80,6 +88,21 @@ export function ReservationWorkspace() {
 
   const prospectById = useMemo(() => new Map(prospects.flatMap((prospect) => (prospect.id === undefined ? [] : [[prospect.id, prospect]]))), [prospects]);
   const reservableOffers = useMemo(() => offers.filter((offer) => codeValueKey(offerStatusOptions, offer.status) === "ACCEPTED"), [offerStatusOptions, offers]);
+  const availableReservationOffers = useMemo(() => {
+    const usedOfferIds = new Set(
+      reservations.flatMap((reservation) => {
+        if (!reservation.offerId || reservation.id === reservationForm.id) {
+          return [];
+        }
+        return [reservation.offerId];
+      }),
+    );
+    return reservableOffers.filter((offer) => offer.id === undefined || !usedOfferIds.has(offer.id));
+  }, [reservableOffers, reservationForm.id, reservations]);
+  const selectedReservation = useMemo(
+    () => reservations.find((reservation) => (selectedReservationId ? reservation.id === selectedReservationId : reservation.id)) ?? null,
+    [reservations, selectedReservationId],
+  );
   const reservationStatuses = useMemo(() => {
     const options = reservationStatusOptions.flatMap((status) => {
       const key = reservationStatusKeyFromText(status.value);
@@ -141,6 +164,12 @@ export function ReservationWorkspace() {
       setOfferStatusOptions(loadedOfferStatuses);
       setReservationStatusOptions(loadedReservationStatuses);
       setDecisionOptions(loadedDecisions);
+      setSelectedReservationId((currentId) => {
+        if (currentId && loadedReservations.some((reservation) => reservation.id === currentId)) {
+          return currentId;
+        }
+        return loadedReservations.find((reservation) => reservation.id)?.id ?? null;
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load reservations.");
     } finally {
@@ -154,6 +183,27 @@ export function ReservationWorkspace() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedReservation?.id) {
+      return;
+    }
+    listActivity("RESERVATION", selectedReservation.id)
+      .then((items) => {
+        if (active) {
+          setSelectedReservationActivity(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSelectedReservationActivity([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedReservation?.id]);
 
   function openNewReservation() {
     setReservationForm({
@@ -174,7 +224,7 @@ export function ReservationWorkspace() {
 
   async function submitReservation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const selectedOffer = reservableOffers.find((offer) => offer.id === numberValue(reservationForm.offerId));
+    const selectedOffer = availableReservationOffers.find((offer) => offer.id === numberValue(reservationForm.offerId));
     const prospectId = numberValue(reservationForm.prospectId) ?? selectedOffer?.prospectId;
     if (!prospectId) {
       setError("Prospect is required for reservation.");
@@ -316,10 +366,12 @@ export function ReservationWorkspace() {
         ))}
       </div>
 
-      <section className="px-4 pb-6 xl:px-6">
-        <div className="panel overflow-hidden rounded-lg">
+      <div className="grid gap-4 px-4 pb-6 xl:grid-cols-[minmax(280px,0.6fr)_minmax(0,1.4fr)] xl:px-6">
+        <section className="panel overflow-hidden rounded-lg">
           <div className="border-b border-[color:var(--line)] p-5">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand)]">Reservation options</p>
+            <h2 className="display-font mt-2 text-xl font-semibold text-[color:var(--brand-strong)]">Reservation list</h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--foreground-subtle)]" />
                 <input className="field w-full rounded-lg py-3 pl-10 pr-3 text-sm" onChange={(event) => setReservationSearch(event.target.value)} placeholder="Search reservation" type="search" value={reservationSearch} />
@@ -334,7 +386,7 @@ export function ReservationWorkspace() {
             </div>
           </div>
 
-          <div className="grid gap-3 p-4">
+          <div className="grid max-h-[720px] gap-3 overflow-y-auto p-4">
             {loading ? (
               <div className="flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4 text-sm text-[color:var(--foreground-muted)]">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -345,26 +397,34 @@ export function ReservationWorkspace() {
             {filteredReservations.map((reservation) => (
               <ReservationCard
                 key={reservation.id ?? reservation.reservationNo}
+                active={selectedReservation?.id === reservation.id}
                 prospect={reservation.prospectId === undefined ? undefined : prospectById.get(reservation.prospectId)}
                 reservation={reservation}
                 decisionOptions={decisionOptions}
                 reservationStatusOptions={reservationStatusOptions}
-                saving={savingReservation}
-                onAction={runReservationAction}
-                onEdit={openEditReservation}
-                onView={setReservationView}
+                onSelect={(reservation) => {
+                  setSelectedReservationActivity([]);
+                  setSelectedReservationId(reservation.id ?? null);
+                }}
               />
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+
+        <ReservationDetailPanel
+          activity={selectedReservationActivity}
+          decisionOptions={decisionOptions}
+          prospect={selectedReservation?.prospectId === undefined ? undefined : prospectById.get(selectedReservation.prospectId)}
+          reservation={selectedReservation}
+          reservationStatusOptions={reservationStatusOptions}
+          saving={savingReservation}
+          onAction={runReservationAction}
+          onEdit={openEditReservation}
+        />
+      </div>
 
       <WorkspaceDrawer eyebrow="Reservation" open={reservationDrawerOpen} title={reservationForm.id ? "Edit reservation" : "Request reservation"} onClose={() => setReservationDrawerOpen(false)}>
-        <ReservationFormPanel approvedOffers={reservableOffers} form={reservationForm} saving={savingReservation} onCancel={() => setReservationDrawerOpen(false)} onChange={setReservationForm} onSubmit={submitReservation} />
-      </WorkspaceDrawer>
-
-      <WorkspaceDrawer eyebrow="Reservation" open={Boolean(reservationView)} title="View reservation" onClose={() => setReservationView(null)}>
-        {reservationView ? <ReservationViewPanel decisionOptions={decisionOptions} reservation={reservationView} reservationStatusOptions={reservationStatusOptions} prospect={reservationView.prospectId === undefined ? undefined : prospectById.get(reservationView.prospectId)} /> : null}
+        <ReservationFormPanel approvedOffers={availableReservationOffers} form={reservationForm} saving={savingReservation} onCancel={() => setReservationDrawerOpen(false)} onChange={setReservationForm} onSubmit={submitReservation} />
       </WorkspaceDrawer>
 
       <WorkspaceDrawer eyebrow="Payment" open={paymentDrawerOpen} title="Record reservation payment" onClose={() => setPaymentDrawerOpen(false)}>
@@ -375,108 +435,156 @@ export function ReservationWorkspace() {
 }
 
 function ReservationCard({
+  active,
   prospect,
   reservation,
   decisionOptions,
   reservationStatusOptions,
-  saving,
-  onAction,
-  onEdit,
-  onView,
+  onSelect,
 }: {
+  active: boolean;
   prospect?: ReservationProspect;
   reservation: Reservation;
   decisionOptions: ErpCodeValue[];
   reservationStatusOptions: ErpCodeValue[];
-  saving: boolean;
-  onAction: (reservation: Reservation, action: ReservationAction) => void;
-  onEdit: (reservation: Reservation) => void;
-  onView: (reservation: Reservation) => void;
+  onSelect: (reservation: Reservation) => void;
 }) {
-  const reservationStatus = reservationStatusKey(reservationStatusOptions, reservation.status);
-
   return (
-    <div className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-raised)] p-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+    <button
+      className="rounded-lg border p-3 text-left transition hover:border-[color:var(--brand-border)] hover:bg-[color:var(--brand-tint)]"
+      style={{
+        background: active ? "var(--brand-tint)" : "var(--surface-raised)",
+        borderColor: active ? "var(--brand-border)" : "var(--line)",
+      }}
+      onClick={() => onSelect(reservation)}
+      type="button"
+    >
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-[color:var(--brand-strong)]">{reservation.reservationNo || "Reservation"}</p>
-            <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[color:var(--brand-strong)]">
-              {reservationStatusLabel(reservationStatusOptions, reservation.status) ?? "Draft"}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-[color:var(--foreground-muted)]">{prospect?.customerName || `Prospect ${reservation.prospectId ?? "-"}`}</p>
-          <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">{formatReservationSummary(reservation, reservationStatusOptions, decisionOptions)}</p>
+          <p className="truncate text-sm font-semibold text-[color:var(--brand-strong)]">{reservation.reservationNo || "Reservation"}</p>
+          <p className="mt-1 truncate text-xs font-medium text-[color:var(--foreground-muted)]">{prospect?.customerName || `Prospect ${reservation.prospectId ?? "-"}`}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {reservationStatus === "DRAFT" ? (
-            <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onEdit(reservation)} type="button">
-              <Edit3 className="h-3.5 w-3.5" />
-              Edit
-            </button>
-          ) : (
-            <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onView(reservation)} type="button">
-              <Search className="h-3.5 w-3.5" />
-              View
-            </button>
-          )}
-          {reservationStatus === "PENDING_APPROVAL" ? (
-            <>
-              <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "approve")} type="button">
-                Approve
-              </button>
-              <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "reject")} type="button">
-                Reject
-              </button>
-            </>
-          ) : null}
-          {reservationStatus === "DRAFT" ? (
-            <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "submit")} type="button">
-              Submit
-            </button>
-          ) : null}
-          {reservationStatus === "PAYMENT_PENDING" ? (
-            <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "payment")} type="button">
-              Payment
-            </button>
-          ) : null}
-          {reservationStatus === "PAID" ? (
-            <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "confirm")} type="button">
-              Confirm
-            </button>
-          ) : null}
-          {reservationStatus === "CONFIRMED" ? (
-            <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onAction(reservation, "move")} type="button">
-              Create Lease
-            </button>
-          ) : null}
-          {["REJECTED", "CANCELLED", "EXPIRED", "MOVED_TO_LEASE"].includes(reservationStatus ?? "") ? (
-            <span className="rounded-lg border border-[color:var(--line)] px-3 py-2 text-xs font-semibold text-[color:var(--foreground-muted)]">No action</span>
-          ) : null}
-        </div>
+        <StatusPill status={reservationStatusKey(reservationStatusOptions, reservation.status)} label={reservationStatusLabel(reservationStatusOptions, reservation.status)} />
       </div>
-    </div>
+      <div className="mt-3 grid gap-1 text-xs text-[color:var(--foreground-muted)]">
+        <p className="truncate">{prospect?.prospectNo ?? "Prospect number pending"}</p>
+        <p className="truncate">{formatReservationSummary(reservation, reservationStatusOptions, decisionOptions)}</p>
+      </div>
+    </button>
   );
 }
 
-function ReservationViewPanel({ decisionOptions, prospect, reservation, reservationStatusOptions }: { decisionOptions: ErpCodeValue[]; prospect?: ReservationProspect; reservation: Reservation; reservationStatusOptions: ErpCodeValue[] }) {
+function ReservationDetailPanel({
+  activity,
+  decisionOptions,
+  prospect,
+  reservation,
+  reservationStatusOptions,
+  saving,
+  onAction,
+  onEdit,
+}: {
+  activity: StatusHistory[];
+  decisionOptions: ErpCodeValue[];
+  prospect?: ReservationProspect;
+  reservation: Reservation | null;
+  reservationStatusOptions: ErpCodeValue[];
+  saving: boolean;
+  onAction: (reservation: Reservation, action: ReservationAction) => void;
+  onEdit: (reservation: Reservation) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<ReservationDetailTab>("DETAIL");
+
+  if (!reservation) {
+    return (
+      <section className="panel rounded-lg p-6">
+        <p className="text-sm text-[color:var(--foreground-muted)]">Select a reservation to view details.</p>
+      </section>
+    );
+  }
+
+  const reservationStatus = reservationStatusKey(reservationStatusOptions, reservation.status);
+  const statusActions = reservationStatusActions(reservationStatus);
+  const canEdit = reservationStatus === "DRAFT";
+
   return (
-    <div className="grid gap-4">
-      <DetailItem label="Reservation no" value={reservation.reservationNo} />
-      <DetailItem label="Status" value={reservationStatusLabel(reservationStatusOptions, reservation.status)} />
-      <DetailItem label="Customer" value={prospect?.customerName} />
-      <DetailItem label="Prospect no" value={prospect?.prospectNo} />
-      <DetailItem label="Offer id" value={reservation.offerId === undefined ? undefined : String(reservation.offerId)} />
-      <DetailItem label="Property id" value={reservation.propertyId === undefined ? undefined : String(reservation.propertyId)} />
-      <DetailItem label="Block id" value={reservation.blockId === undefined ? undefined : String(reservation.blockId)} />
-      <DetailItem label="Floor id" value={reservation.floorId === undefined ? undefined : String(reservation.floorId)} />
-      <DetailItem label="Unit id" value={reservation.unitId === undefined ? undefined : String(reservation.unitId)} />
-      <DetailItem label="Approval" value={codeValueLabel(decisionOptions, reservation.approvalStatus)} />
-      <DetailItem label="Reservation fee" value={reservation.reservationFee === undefined ? undefined : String(reservation.reservationFee)} />
-      <DetailItem label="Paid amount" value={reservation.paidAmount === undefined ? undefined : String(reservation.paidAmount)} />
-      <DetailItem label="Payment waived" value={reservation.paymentWaived ? "Yes" : "No"} />
-      <DetailItem label="Expires at" value={formatDateTime(reservation.expiresAt)} />
-    </div>
+    <section className="panel overflow-hidden rounded-lg">
+      <div className="border-b border-[color:var(--line)] p-5 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--brand)]">Reservation details</p>
+            <h2 className="display-font mt-2 text-2xl font-semibold text-[color:var(--brand-strong)]">{reservation.reservationNo || "Reservation"}</h2>
+            <p className="mt-2 text-sm text-[color:var(--foreground-muted)]">{prospect?.customerName || `Prospect ${reservation.prospectId ?? "-"}`}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <StatusPill status={reservationStatus} label={reservationStatusLabel(reservationStatusOptions, reservation.status)} />
+            {canEdit ? (
+              <button className="btn-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} onClick={() => onEdit(reservation)} type="button">
+                <Edit3 className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            ) : null}
+            {statusActions.length > 0 ? (
+              statusActions.map((item) => (
+                <button className="btn-secondary rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50" disabled={saving} key={item.action} onClick={() => onAction(reservation, item.action)} type="button">
+                  {item.label}
+                </button>
+              ))
+            ) : (
+              <span className="rounded-lg border border-[color:var(--line)] px-3 py-2 text-xs font-semibold text-[color:var(--foreground-muted)]">No status action</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-[color:var(--line)] px-5 py-3 sm:px-6">
+        <div className="flex gap-2 overflow-x-auto">
+          {(["DETAIL", "ACTIVITY"] as ReservationDetailTab[]).map((tab) => (
+            <button
+              className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition"
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                background: activeTab === tab ? "var(--brand-tint)" : "transparent",
+                color: activeTab === tab ? "var(--brand)" : "var(--foreground-muted)",
+                border: `1px solid ${activeTab === tab ? "var(--brand-border)" : "transparent"}`,
+              }}
+              type="button"
+            >
+              {formatLabel(tab)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === "DETAIL" ? (
+        <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+          <DetailItem label="Reservation no" value={reservation.reservationNo} />
+          <DetailItem label="Status" value={reservationStatusLabel(reservationStatusOptions, reservation.status)} />
+          <DetailItem label="Customer" value={prospect?.customerName} />
+          <DetailItem label="Prospect no" value={prospect?.prospectNo} />
+          <DetailItem label="Offer id" value={reservation.offerId === undefined ? undefined : String(reservation.offerId)} />
+          <DetailItem label="Property id" value={reservation.propertyId === undefined ? undefined : String(reservation.propertyId)} />
+          <DetailItem label="Block id" value={reservation.blockId === undefined ? undefined : String(reservation.blockId)} />
+          <DetailItem label="Floor id" value={reservation.floorId === undefined ? undefined : String(reservation.floorId)} />
+          <DetailItem label="Unit id" value={reservation.unitId === undefined ? undefined : String(reservation.unitId)} />
+          <DetailItem label="Approval" value={codeValueLabel(decisionOptions, reservation.approvalStatus)} />
+          <DetailItem label="Reservation fee" value={reservation.reservationFee === undefined ? undefined : String(reservation.reservationFee)} />
+          <DetailItem label="Paid amount" value={reservation.paidAmount === undefined ? undefined : String(reservation.paidAmount)} />
+          <DetailItem label="Payment waived" value={reservation.paymentWaived ? "Yes" : "No"} />
+          <DetailItem label="Expires at" value={formatDateTime(reservation.expiresAt)} />
+        </div>
+      ) : null}
+
+      {activeTab === "ACTIVITY" ? (
+        <div className="p-5 sm:p-6">
+          <h3 className="text-sm font-semibold text-[color:var(--brand-strong)]">Activity</h3>
+          <div className="mt-4">
+            <ActivityTimeline activity={activity} />
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -503,7 +611,7 @@ function ReservationFormPanel({ approvedOffers, form, saving, onCancel, onChange
           ))}
         </select>
       </label>
-      {selectedOffer?.prospectId !== undefined ? <DetailItem label="Prospect id" value={String(selectedOffer.prospectId)} /> : null}
+      {selectedOffer ? <SelectedOfferPropertyDetails offer={selectedOffer} /> : null}
       {approvedOffers.length === 0 ? <p className="rounded-lg border border-[color:var(--line)] p-3 text-sm text-[color:var(--foreground-muted)]">No accepted offers available for reservation.</p> : null}
       <Field label="Reservation fee" type="number" value={form.reservationFee} onChange={(value) => onChange({ ...form, reservationFee: value })} />
       <Field label="Expiry date and time" type="datetime-local" value={form.expiresAt} onChange={(value) => onChange({ ...form, expiresAt: value })} />
@@ -525,6 +633,34 @@ function ReservationFormPanel({ approvedOffers, form, saving, onCancel, onChange
         </button>
       </div>
     </form>
+  );
+}
+
+function SelectedOfferPropertyDetails({ offer }: { offer: ReservationOffer }) {
+  return (
+    <section className="rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-muted)] p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground-muted)]">Property details</p>
+        <h3 className="text-base font-semibold text-[color:var(--brand-strong)]">{propertyDisplayName(offer.propertyName) || "Property pending"}</h3>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <DetailItem label="Offer no" value={offer.offerNo} />
+        <DetailItem label="Prospect id" value={offer.prospectId === undefined ? undefined : String(offer.prospectId)} />
+        <DetailItem label="Property id" value={offer.propertyId === undefined ? undefined : String(offer.propertyId)} />
+        <DetailItem label="Property" value={propertyDisplayName(offer.propertyName)} />
+        <DetailItem label="Requirement level" value={offer.requirementLevel === undefined ? undefined : String(offer.requirementLevel)} />
+        <DetailItem label="Block" value={formatIdName(offer.blockId, offer.blockName)} />
+        <DetailItem label="Floor" value={formatIdName(offer.floorId, offer.floorName)} />
+        <DetailItem label="Unit id" value={offer.unitId === undefined ? undefined : String(offer.unitId)} />
+        <DetailItem label="Base amount" value={offer.baseAmount === undefined ? undefined : String(offer.baseAmount)} />
+        <DetailItem label="Discount amount" value={offer.discountAmount === undefined ? undefined : String(offer.discountAmount)} />
+        <DetailItem label="Final amount" value={offer.finalAmount === undefined ? undefined : String(offer.finalAmount)} />
+        <DetailItem label="Approval required" value={offer.approvalRequired ? "Yes" : "No"} />
+      </div>
+      <div className="mt-3">
+        <DetailItem label="Special terms" value={offer.specialTerms} />
+      </div>
+    </section>
   );
 }
 
@@ -615,6 +751,13 @@ function propertyDisplayName(value?: string) {
   return value?.replace(/\s+\(\d+\)$/, "");
 }
 
+function formatIdName(id?: number, name?: string) {
+  if (id === undefined) {
+    return name;
+  }
+  return name ? `${name} (${id})` : String(id);
+}
+
 function formatReservationSummary(reservation: Reservation, reservationStatusOptions: ErpCodeValue[], decisionOptions: ErpCodeValue[]) {
   return [
     `Offer ${reservation.offerId ?? "-"}`,
@@ -692,6 +835,56 @@ function reservationStatusLabel(options: ErpCodeValue[], value?: number) {
 function reservationStatusLabelByKey(options: ErpCodeValue[], key: string) {
   const status = options.find((option) => reservationStatusKeyFromText(option.value) === key);
   return status?.value;
+}
+
+function reservationStatusActions(status?: string): ReservationStatusAction[] {
+  if (status === "DRAFT") {
+    return [
+      { action: "submit", label: "Submit" },
+      { action: "cancel", label: "Cancel" },
+    ];
+  }
+  if (status === "PENDING_APPROVAL") {
+    return [
+      { action: "approve", label: "Approve" },
+      { action: "reject", label: "Reject" },
+      { action: "cancel", label: "Cancel" },
+      { action: "expire", label: "Expire" },
+    ];
+  }
+  if (status === "PAYMENT_PENDING") {
+    return [
+      { action: "payment", label: "Payment" },
+      { action: "cancel", label: "Cancel" },
+      { action: "expire", label: "Expire" },
+    ];
+  }
+  if (status === "PAID") {
+    return [
+      { action: "confirm", label: "Confirm" },
+      { action: "cancel", label: "Cancel" },
+      { action: "expire", label: "Expire" },
+    ];
+  }
+  if (status === "CONFIRMED") {
+    return [
+      { action: "move", label: "Create Lease" },
+      { action: "cancel", label: "Cancel" },
+    ];
+  }
+  return [];
+}
+
+function StatusPill({ status, label }: { status?: string; label?: string }) {
+  const tone = status === "CONFIRMED" || status === "PAID" || status === "MOVED_TO_LEASE" ? "success" : status === "REJECTED" || status === "CANCELLED" || status === "EXPIRED" ? "danger" : "warning";
+  const className =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "danger"
+        ? "border-red-200 bg-red-50 text-red-700"
+        : "border-amber-200 bg-amber-50 text-amber-700";
+
+  return <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${className}`}>{label ?? (status ? formatLabel(status) : "Draft")}</span>;
 }
 
 function Notice({ tone, text }: { tone: "danger" | "success"; text: string }) {

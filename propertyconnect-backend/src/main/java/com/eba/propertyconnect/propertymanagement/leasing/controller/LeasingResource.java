@@ -296,9 +296,9 @@ public class LeasingResource {
 	}
 
 	@GET
-	@Path("/reports/summary")
-	public Response reportSummary() {
-		return ok(service.reportSummary());
+	@Path("/activity/{entityType}/{entityId}")
+	public Response listActivity(@PathParam("entityType") String entityType, @PathParam("entityId") Long entityId) {
+		return okOrBadRequest(() -> service.listActivity(entityType, entityId));
 	}
 
 	private Response ok(Object body) {
