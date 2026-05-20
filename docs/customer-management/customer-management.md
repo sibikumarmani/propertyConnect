@@ -1,16 +1,16 @@
-# Customer Management Leasing Module
+# Customer Management
 
 Document type: Module overview and documentation index  
 Application area: PropertyConnect Customer Management  
-Scope: Commercial leasing lead to reservation  
+Scope: Commercial customer lead to reservation  
 
 ---
 
 ## 1. Purpose
 
-This file is the main Customer Management leasing guide for PropertyConnect. It documents the current lead-to-reservation module implemented under the backend `leasing` package and the frontend Customer Management route group.
+This file is the main Customer Management guide for PropertyConnect. It documents the current lead-to-reservation process implemented under the backend `leasing` package and the frontend Customer Management route group.
 
-Current leasing scope covers commercial customer enquiry through reservation:
+Current Customer Management scope covers commercial customer enquiry through reservation:
 
 ```text
 Customer Search
@@ -25,7 +25,7 @@ Customer Search
     -> Move To Lease
 ```
 
-Lease agreement generation, lease activation, renewal, amendment, termination, tenant move-in, and finance posting beyond reservation receipt are outside the Customer Management leasing scope. Those processes belong to [Lease Management](../lease-management/lease-management.md).
+Lease agreement generation, lease activation, renewal, amendment, termination, tenant move-in, and finance posting beyond reservation receipt are outside the Customer Management scope. Those processes belong to [Lease Management](../lease-management/lease-management.md).
 
 The `move-to-lease` action is currently a handoff point. It updates the reservation workflow state and prepares the record for the separate Lease Management module.
 
@@ -42,7 +42,7 @@ The `move-to-lease` action is currently a handoff point. It updates the reservat
 | Backend style | Jakarta EE resource, service, MyBatis mapper interface, MyBatis XML |
 | Frontend route group | `propertyconnect-frontend/src/app/propertyconnect/customer-management` |
 | REST base path | `/propertymanagement/customer-management` |
-| Cache scope | `leasing` through `CacheHelper` |
+| Cache scope | `leasing` through `CacheHelper` because the current backend package is named `leasing` |
 
 Do not add repository classes for this module. Keep the current mapper interface plus mapper XML style.
 
@@ -177,11 +177,11 @@ Site visit behavior:
 
 ## 9. Core Rules
 
-- Use domain POJOs directly for current leasing REST payloads.
+- Use domain POJOs directly for current Customer Management REST payloads.
 - Do not recreate the removed DTO folder unless requested.
 - Add validation and status transition logic in `LeasingService`.
 - Store meaningful status changes in `pa_txn_leasing_status_history`.
-- Clear leasing cache after writes that affect list, report, or availability reads.
+- Clear the Customer Management cache after writes that affect list, report, or availability reads.
 - Code-value lookup belongs in services; React code should use resolved code-value names or normalized keys for conditions.
 - Reservation `lead_id` is nullable.
 - Reservation `unit_id` is nullable until a unit-level reservation needs to block inventory.
@@ -203,18 +203,7 @@ Customer Management owns:
 - Offers and negotiations
 - Reservation request, approval, payment, confirmation, cancellation, expiry, and move-to-lease handoff
 
-Lease Management owns:
-
-- Lease dashboard
-- Lease configuration
-- Lease contract
-- New lease
-- Amendment
-- Renewal
-- Termination
-- Lease reports
-
-Refer to [Lease Management](../lease-management/lease-management.md) for the contract lifecycle.
+The downstream lease contract lifecycle is documented separately in [Lease Management](../lease-management/lease-management.md). Do not add lease contract, amendment, renewal, or termination process details to this Customer Management document.
 
 ---
 

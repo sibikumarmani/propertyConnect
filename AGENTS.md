@@ -73,7 +73,7 @@ propertyconnect-frontend/src/app/propertyconnect/customer-management
 
 - Keep backend code under `propertyconnect-backend`.
 - Keep frontend code under `propertyconnect-frontend`.
-- Use domain POJOs directly for current leasing REST payloads.
+- Use domain POJOs directly for current Customer Management REST payloads.
 - Do not recreate the removed DTO folder unless requested.
 - Keep each domain object in a separate Java file.
 - Keep each process mapper in a separate Java interface and XML file.
@@ -100,7 +100,7 @@ Frontend:
 
 Customer Management:
 
-- [Leasing Module](docs/leasing/leasing.md)
+- [Customer Management](docs/customer-management/customer-management.md)
 
 Lease Management:
 

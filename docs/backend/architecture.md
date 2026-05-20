@@ -60,7 +60,7 @@ Rules:
 
 ## Domain Model
 
-The current leasing module uses POJOs directly for REST payloads.
+The current Customer Management module uses POJOs directly for REST payloads.
 
 Rules:
 
@@ -70,7 +70,7 @@ Rules:
 - Keep status fields as strings unless a module requires stricter enum mapping.
 - Do not add DTO classes unless the project direction changes.
 
-## Current Leasing Backend Files
+## Current Customer Management Backend Files
 
 Controller:
 

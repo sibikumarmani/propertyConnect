@@ -52,7 +52,7 @@ StatusHistoryMapper.xml
 - Keep mapper method names aligned with service actions.
 - Keep SQL in XML mapper files.
 - Use one mapper per business process or closely related object.
-- Do not create one combined mapper for the whole leasing module.
+- Do not create one combined mapper for the whole Customer Management module.
 - Do not create repository classes.
 - Use readable SQL with explicit columns.
 - Keep result mappings near the SQL that uses them.
