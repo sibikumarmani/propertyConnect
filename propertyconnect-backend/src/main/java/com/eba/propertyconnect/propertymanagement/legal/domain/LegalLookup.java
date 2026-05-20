@@ -5,6 +5,7 @@ public class LegalLookup {
 	public Long id;
 	public String code;
 	public String label;
+	public Long parentId;
 
 	public LegalLookup() {
 	}
@@ -13,5 +14,10 @@ public class LegalLookup {
 		this.id = id;
 		this.code = code;
 		this.label = label;
+	}
+
+	public LegalLookup(Long id, String code, String label, Long parentId) {
+		this(id, code, label);
+		this.parentId = parentId;
 	}
 }

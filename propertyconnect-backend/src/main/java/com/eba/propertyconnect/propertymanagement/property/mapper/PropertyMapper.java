@@ -45,6 +45,8 @@ public interface PropertyMapper {
 
 	public List<MasterRecord> listUnits(Long floorId);
 
+	public List<MasterRecord> listCompanyUnits(Long companyId);
+
 	public List<MasterRecord> listAmenities(Long propertyId);
 
 	public int insertBlock(MasterRecord record);

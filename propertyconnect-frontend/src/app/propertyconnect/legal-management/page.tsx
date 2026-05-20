@@ -28,6 +28,7 @@ import {
   createLegalCard,
   getLegalDashboard,
   getLegalLookups,
+  legalApprovalStatusOptions,
   searchLegalCards,
   updateLegalCard,
   type LegalCard,
@@ -57,15 +58,15 @@ const emptyLookups: LegalLookups = {
   legalTypes: [],
   stages: [],
   reasons: [],
+  tenants: [],
+  properties: [],
+  units: [],
   documentStatuses: [],
+  cardFlows: [],
   approvalStatuses: [],
   documentTypes: [],
 };
 const emptyEntityOptions: LegalLookup[] = [];
-const workflowByType: Record<number, Record<number, number[]>> = {
-  1: { 1: [2], 2: [3], 3: [4], 4: [5], 5: [6], 6: [7], 7: [8] },
-  2: { 1: [9], 9: [10], 10: [11, 12], 11: [13], 12: [13] },
-};
 
 export default function LegalManagementPage({ initialCardMode, initialView = "dashboard" }: LegalManagementPageProps) {
   const [view, setView] = useState<ViewMode>(initialView);
@@ -103,22 +104,22 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialView]);
 
-  const groupedCards = useMemo(() => groupByLegalType(cards), [cards]);
-  const workflowOptions = activeCard ? workflowByType[activeCard.legalTypeId]?.[activeCard.documentStatusId] ?? [] : [];
+  const groupedCards = useMemo(() => groupByLegalType(cards, lookups.legalTypes), [cards, lookups.legalTypes]);
+  const workflowOptions = activeCard ? lookups.cardFlows : [];
   const isEditable = cardMode === "create" || cardMode === "edit";
 
   async function loadInitial() {
     try {
       setLoading(true);
       const [lookupData, dashboard] = await Promise.all([getLegalLookups(), getLegalDashboard()]);
-      setLookups(maskTemporaryLegalLookups(lookupData));
+      setLookups(lookupData);
       setDashboardCounts({
         total: dashboard.totalCount,
         completed: dashboard.completedCount,
         inProgress: dashboard.inProgressCount,
         typeCounts: [],
       });
-      setCards(maskTemporaryLegalCards(dashboard.cards ?? []));
+      setCards(dashboard.cards ?? []);
       if (initialView === "card") {
         createBlankCard(lookupData);
       }
@@ -138,7 +139,7 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
       typeCounts: [],
     });
     if (view === "dashboard") {
-      setCards(maskTemporaryLegalCards(dashboard.cards ?? []));
+      setCards(dashboard.cards ?? []);
     }
   }
 
@@ -150,7 +151,7 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
       const data = await searchLegalCards(search);
       setCriteria(nextCriteria);
       setDashboardListTitle(title);
-      setCards(maskTemporaryLegalCards(data));
+      setCards(data);
     } catch (error) {
       showToast("error", errorMessage(error, "Dashboard drill-down failure."));
     } finally {
@@ -167,7 +168,7 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
       setCriteria(nextCriteria);
       setDraftCriteria(nextCriteria);
       setHistoryTitle(title);
-      setCards(maskTemporaryLegalCards(data));
+      setCards(data);
       setView("history");
     } catch (error) {
       showToast("error", errorMessage(error, "Search/load failure."));
@@ -178,17 +179,17 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
 
   function createBlankCard(sourceLookups = lookups) {
     const card: LegalCard = {
-      legalTypeId: firstId(sourceLookups.legalTypes, 1),
-      currentStageId: firstId(sourceLookups.stages, 1),
-      reasonId: firstId(sourceLookups.reasons, 1),
+      legalTypeId: firstId(sourceLookups.legalTypes),
+      currentStageId: defaultStatusId(sourceLookups.stages, "INITIATED"),
+      reasonId: firstId(sourceLookups.reasons),
       tenantId: 0,
       propertyId: 0,
       unitId: 0,
       advocateId: undefined,
       caseNumber: "",
       priority: "M",
-      documentStatusId: firstId(sourceLookups.documentStatuses, 1),
-      approvalStatusId: firstId(sourceLookups.approvalStatuses, 1),
+      documentStatusId: defaultStatusId(sourceLookups.documentStatuses, "INITIATED"),
+      approvalStatusId: approvedStatusId(sourceLookups.approvalStatuses),
       documentDate: isoToday,
       dueDate: isoToday,
       dueAmount: "0",
@@ -229,7 +230,7 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
     const payload = { ...activeCard, comments: saveComments };
     try {
       const saved = activeCard.id ? await updateLegalCard(activeCard.id, payload) : await createLegalCard(payload);
-      setActiveCard(maskTemporaryLegalCard(saved));
+      setActiveCard(saved);
       setCardMode("view");
       setSaveComments("");
       setSaveDialogOpen(false);
@@ -245,7 +246,12 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
       return;
     }
     const existingNames = new Set((activeCard.attachments ?? []).map((attachment) => attachment.fileName.toLowerCase()));
-    const documentTypeId = firstId(lookups.documentTypes, 1);
+    const documentTypeId = firstId(lookups.documentTypes);
+    if (!documentTypeId) {
+      showToast("error", "Attachment document type data is not available.");
+      event.target.value = "";
+      return;
+    }
     const nextAttachments = Array.from(event.target.files).reduce<LegalCardAttachment[]>((items, file) => {
       if (existingNames.has(file.name.toLowerCase()) || items.some((item) => item.fileName.toLowerCase() === file.name.toLowerCase())) {
         showToast("warning", `Duplicate attachment skipped: ${file.name}`);
@@ -289,7 +295,7 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
     }
     try {
       const saved = await applyLegalWorkflow(activeCard.id, { statusId: Number(workflowStatusId), comments: workflowComments });
-      setActiveCard(maskTemporaryLegalCard(saved));
+      setActiveCard(saved);
       setWorkflowOpen(false);
       setWorkflowComments("");
       setWorkflowStatusId("");
@@ -319,8 +325,8 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
           totalListCount={cards.length}
           totalCount={dashboardCounts.total}
           typeCounts={dashboardCounts.typeCounts}
-          onDrillCompleted={() => loadDashboardDrill({ ...defaultCriteria(), documentStatusIds: [14], documentDateFrom: "", documentDateTo: "" }, "Completed Legal Cards")}
-          onDrillInProgress={() => loadDashboardDrill({ ...defaultCriteria(), documentStatusIds: lookups.documentStatuses.filter((status) => status.id !== 14).map((status) => status.id), documentDateFrom: "", documentDateTo: "" }, "In Progress Legal Cards")}
+          onDrillCompleted={() => loadDashboardDrill({ ...defaultCriteria(), documentStatusIds: completedDocumentStatusIds(lookups.documentStatuses), documentDateFrom: "", documentDateTo: "" }, "Completed Legal Cards")}
+          onDrillInProgress={() => loadDashboardDrill({ ...defaultCriteria(), documentStatusIds: lookups.documentStatuses.filter((status) => !isLookupValue(status, "COMPLETED")).map((status) => status.id), documentDateFrom: "", documentDateTo: "" }, "In Progress Legal Cards")}
           onDrillTotal={() => loadDashboardDrill({ ...defaultCriteria(), documentDateFrom: "", documentDateTo: "" }, "All Legal Cards")}
           onDrillType={(legalTypeId) => loadDashboardDrill({ ...defaultCriteria(), legalTypeId, documentDateFrom: "", documentDateTo: "" }, `${labelFor(lookups.legalTypes, legalTypeId)} Legal Cards`)}
           onOpenCard={openCard}
@@ -390,7 +396,7 @@ export default function LegalManagementPage({ initialCardMode, initialView = "da
               showToast("warning", "Workflow is not allowed for this status.");
               return;
             }
-            setWorkflowStatusId(workflowOptions[0]);
+            setWorkflowStatusId(workflowOptions[0].id);
             setWorkflowOpen(true);
           }}
           onUpdateAttachment={updateAttachment}
@@ -552,11 +558,15 @@ function LegalCardListPanel(props: {
                   </button>
                 </td>
               </tr>
-              {props.expandedGroups[legalType] ?? true ? cards.map((card) => <CardRow card={card} key={card.id ?? card.legalCardNo} onOpenCard={props.onOpenCard} />) : null}
-              <tr className={groupIndex % 2 === 0 ? "bg-emerald-50 text-sm font-bold text-[color:var(--brand-strong)]" : "bg-blue-50 text-sm font-bold text-[color:var(--brand-strong)]"}>
-                <td className="border-l-4 border-blue-500 px-5 py-4">Total Count : {cards.length}</td>
-                <td colSpan={6} />
-              </tr>
+              {props.expandedGroups[legalType] ?? true ? (
+                <>
+                  {cards.map((card) => <CardRow card={card} key={card.id ?? card.legalCardNo} onOpenCard={props.onOpenCard} />)}
+                  <tr className={groupIndex % 2 === 0 ? "bg-emerald-50 text-sm font-bold text-[color:var(--brand-strong)]" : "bg-blue-50 text-sm font-bold text-[color:var(--brand-strong)]"}>
+                    <td className="border-l-4 border-blue-500 px-5 py-4">Total Count : {cards.length}</td>
+                    <td colSpan={6} />
+                  </tr>
+                </>
+              ) : null}
             </tbody>
           ))}
           {!Object.keys(props.groupedCards).length ? (
@@ -594,7 +604,7 @@ function CardView(props: {
   saveComments: string;
   workflowComments: string;
   workflowOpen: boolean;
-  workflowOptions: number[];
+  workflowOptions: LegalLookup[];
   workflowStatusId: number | "";
   onAddAttachments: (event: ChangeEvent<HTMLInputElement>) => void;
   onBack: () => void;
@@ -625,8 +635,8 @@ function CardView(props: {
             <ArrowLeft size={22} /> Back
           </button>
           {props.cardMode === "view" ? <button className="btn-secondary flex h-12 items-center gap-2 rounded-lg px-5 text-lg font-semibold" onClick={props.onCreate} type="button"><Plus size={20} /> New</button> : null}
-          {props.cardMode === "view" && card.documentStatusId === 1 ? <button className="btn-secondary flex h-12 items-center gap-2 rounded-lg px-5 text-lg font-semibold" onClick={props.onEdit} type="button"><Edit3 size={20} /> Edit</button> : null}
-          {props.cardMode === "view" && card.approvalStatusId === 1 && props.workflowOptions.length ? <button className="btn-primary flex h-12 items-center gap-2 rounded-lg px-5 text-lg font-semibold" onClick={props.onShowWorkflow} type="button"><Gavel size={20} /> Action</button> : null}
+          {props.cardMode === "view" && isDocumentStatus(card.documentStatusId, props.lookups.documentStatuses, "INITIATED") ? <button className="btn-secondary flex h-12 items-center gap-2 rounded-lg px-5 text-lg font-semibold" onClick={props.onEdit} type="button"><Edit3 size={20} /> Edit</button> : null}
+          {props.cardMode === "view" && isDocumentStatus(card.approvalStatusId, props.lookups.approvalStatuses, "APPROVED") && props.workflowOptions.length ? <button className="btn-primary flex h-12 items-center gap-2 rounded-lg px-5 text-lg font-semibold" onClick={props.onShowWorkflow} type="button"><Gavel size={20} /> Action</button> : null}
           {props.isEditable ? <button className="btn-primary flex h-12 items-center gap-2 rounded-lg px-5 text-lg font-semibold" form="legal-card-form" type="submit"><Save size={20} /> Save</button> : null}
         </div>
       </div>
@@ -639,10 +649,12 @@ function CardView(props: {
               <LegalCardTab active={activeTab === "attachments"} icon={Paperclip} label="Attachments" onClick={() => setActiveTab("attachments")} tone="brown" />
               <LegalCardTab active={activeTab === "timeline"} icon={GitBranch} label="Timeline" onClick={() => setActiveTab("timeline")} tone="green" />
             </div>
-            <div className="mb-3 flex flex-wrap gap-3 lg:mb-0">
-              <LegalStatusPill label="Document" value={card.documentStatus ?? labelFor(props.lookups.documentStatuses, card.documentStatusId)} variant="document" />
-              <LegalStatusPill label="Approval" value={card.approvalStatus ?? labelFor(props.lookups.approvalStatuses, card.approvalStatusId)} variant="approval" />
-            </div>
+            {props.cardMode === "create" ? null : (
+              <div className="mb-3 flex flex-wrap gap-3 lg:mb-0">
+                <LegalStatusPill label="Document" value={card.documentStatus ?? labelFor(props.lookups.documentStatuses, card.documentStatusId)} variant="document" />
+                <LegalStatusPill label="Approval" value={card.approvalStatus ?? labelFor(props.lookups.approvalStatuses, card.approvalStatusId)} variant="approval" />
+              </div>
+            )}
           </div>
 
           {activeTab === "details" ? (
@@ -652,9 +664,9 @@ function CardView(props: {
                   <LookupSelect allowAny disabled={!props.isEditable} label="Legal Type *" lookups={props.lookups.legalTypes} value={props.lookups.legalTypes.length ? card.legalTypeId : 0} onChange={(value) => props.onUpdateCard({ legalTypeId: value })} />
                   <LookupSelect allowAny disabled label="Current Stage *" lookups={props.lookups.stages} value={props.lookups.stages.length ? card.currentStageId : 0} onChange={(value) => props.onUpdateCard({ currentStageId: value })} />
                   <LookupSelect allowAny disabled={!props.isEditable} label="Reason *" lookups={props.lookups.reasons} value={props.lookups.reasons.length ? card.reasonId : 0} onChange={(value) => props.onUpdateCard({ reasonId: value })} />
-                  <LookupSelect allowAny disabled={!props.isEditable} label="Tenant *" lookups={emptyEntityOptions} value={card.tenantId || 0} onChange={(value) => props.onUpdateCard({ tenantId: value })} />
-                  <LookupSelect allowAny disabled={!props.isEditable} label="Property *" lookups={emptyEntityOptions} value={card.propertyId || 0} onChange={(value) => props.onUpdateCard({ propertyId: value })} />
-                  <LookupSelect allowAny disabled={!props.isEditable} label="Unit *" lookups={emptyEntityOptions} value={card.unitId || 0} onChange={(value) => props.onUpdateCard({ unitId: value })} />
+                  <LookupSelect allowAny disabled={!props.isEditable} label="Tenant *" lookups={props.lookups.tenants} value={card.tenantId || 0} onChange={(value) => props.onUpdateCard({ tenantId: value })} />
+                  <LookupSelect allowAny disabled={!props.isEditable} label="Property *" lookups={props.lookups.properties} value={card.propertyId || 0} onChange={(value) => props.onUpdateCard({ propertyId: value, unitId: 0 })} />
+                  <LookupSelect allowAny disabled={!props.isEditable} label="Unit *" lookups={unitsForProperty(props.lookups.units, card.propertyId)} value={lookupValueFor(unitsForProperty(props.lookups.units, card.propertyId), card.unitId)} onChange={(value) => props.onUpdateCard({ unitId: value })} />
                   <InputField disabled={!props.isEditable} label="Case Number" value={card.caseNumber ?? ""} onChange={(value) => props.onUpdateCard({ caseNumber: value })} />
                   <LookupSelect allowAny disabled={!props.isEditable} label="Advocate" lookups={emptyEntityOptions} value={card.advocateId ?? 0} onChange={(value) => props.onUpdateCard({ advocateId: value || undefined })} />
                 </div>
@@ -699,7 +711,7 @@ function CardView(props: {
       {props.workflowOpen ? (
         <Dialog title="Workflow Action" onClose={props.onWorkflowClose}>
           <div className="space-y-4">
-            <SelectField label="Action" value={String(props.workflowStatusId)} values={props.workflowOptions.map((id) => [String(id), labelFor(props.lookups.documentStatuses, id)])} onChange={(value) => props.onSetWorkflowStatusId(value ? Number(value) : "")} />
+            <SelectField label="Action" value={String(props.workflowStatusId)} values={props.workflowOptions.map((option) => [String(option.id), option.label])} onChange={(value) => props.onSetWorkflowStatusId(value ? Number(value) : "")} />
             <Field label="Comments">
               <textarea className="field min-h-28 w-full rounded-lg px-3 py-2 text-sm" onChange={(event) => props.onSetWorkflowComments(event.target.value)} value={props.workflowComments} />
             </Field>
@@ -828,20 +840,22 @@ function TimelinePanel({ entries }: { entries: NonNullable<LegalCard["timeline"]
 }
 
 function SearchDialog({ criteria, lookups, onClose, onReset, onSubmit, setCriteria }: { criteria: SearchCriteria; lookups: LegalLookups; onClose: () => void; onReset: () => void; onSubmit: () => void; setCriteria: (criteria: SearchCriteria) => void }) {
+  const approvalStatuses = legalApprovalStatusOptions(lookups.approvalStatuses);
+
   return (
     <Dialog title="Search" onClose={onClose} size="wide">
       <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
         <SearchControl><InputField label="Legal Card No." value={criteria.legalCardNo ?? ""} onChange={(value) => setCriteria({ ...criteria, legalCardNo: value })} /></SearchControl>
         <SearchControl><LookupSelect allowAny label="Legal Type" lookups={lookups.legalTypes} value={criteria.legalTypeId ?? 0} onChange={(value) => setCriteria({ ...criteria, legalTypeId: value || undefined })} /></SearchControl>
-        <SearchControl><LookupSelect allowAny label="Tenant" lookups={emptyEntityOptions} value={criteria.tenantId ?? 0} onChange={(value) => setCriteria({ ...criteria, tenantId: value || undefined })} /></SearchControl>
-        <SearchControl><LookupSelect allowAny label="Property" lookups={emptyEntityOptions} value={criteria.propertyId ?? 0} onChange={(value) => setCriteria({ ...criteria, propertyId: value || undefined })} /></SearchControl>
-        <SearchControl><LookupSelect allowAny label="Unit" lookups={emptyEntityOptions} value={criteria.unitId ?? 0} onChange={(value) => setCriteria({ ...criteria, unitId: value || undefined })} /></SearchControl>
+        <SearchControl><LookupSelect allowAny label="Tenant" lookups={lookups.tenants} value={criteria.tenantId ?? 0} onChange={(value) => setCriteria({ ...criteria, tenantId: value || undefined })} /></SearchControl>
+        <SearchControl><LookupSelect allowAny label="Property" lookups={lookups.properties} value={criteria.propertyId ?? 0} onChange={(value) => setCriteria({ ...criteria, propertyId: value || undefined, unitId: undefined })} /></SearchControl>
+        <SearchControl><LookupSelect allowAny label="Unit" lookups={unitsForProperty(lookups.units, criteria.propertyId)} value={lookupValueFor(unitsForProperty(lookups.units, criteria.propertyId), criteria.unitId)} onChange={(value) => setCriteria({ ...criteria, unitId: value || undefined })} /></SearchControl>
         <SearchControl><LookupSelect allowAny label="Advocate" lookups={emptyEntityOptions} value={criteria.advocateId ?? 0} onChange={(value) => setCriteria({ ...criteria, advocateId: value || undefined })} /></SearchControl>
         <SearchControl><InputField label="Document Date From" type="date" value={criteria.documentDateFrom ?? ""} onChange={(value) => setCriteria({ ...criteria, documentDateFrom: value })} /></SearchControl>
         <SearchControl><InputField label="Document Date To" type="date" value={criteria.documentDateTo ?? ""} onChange={(value) => setCriteria({ ...criteria, documentDateTo: value })} /></SearchControl>
         <SearchControl><InputField label="Due Date" type="date" value={criteria.dueDate ?? ""} onChange={(value) => setCriteria({ ...criteria, dueDate: value })} /></SearchControl>
         <SearchControl><MultiSelect label="Document Status" options={lookups.documentStatuses} selected={criteria.documentStatusIds ?? []} onChange={(values) => setCriteria({ ...criteria, documentStatusIds: values })} /></SearchControl>
-        <SearchControl><MultiSelect label="Approval Status" options={lookups.approvalStatuses} selected={criteria.approvalStatusIds ?? []} onChange={(values) => setCriteria({ ...criteria, approvalStatusIds: values })} /></SearchControl>
+        <SearchControl><MultiSelect label="Approval Status" options={approvalStatuses} selected={criteria.approvalStatusIds ?? []} onChange={(values) => setCriteria({ ...criteria, approvalStatusIds: values })} /></SearchControl>
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button className="btn-secondary h-10 rounded-lg px-4 text-sm font-semibold" onClick={onReset} type="button">Reset</button>
@@ -957,22 +971,78 @@ function InputField({ disabled, label, onChange, type = "text", value }: { disab
 }
 
 function SelectField({ disabled, label, onChange, value, values }: { disabled?: boolean; label: string; onChange: (value: string) => void; value: string; values: string[][] }) {
-  return (
-    <Field label={label}>
-      <select className="field h-10 w-full rounded-lg px-3 text-sm disabled:opacity-70" disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
-        {values.map(([id, labelText]) => <option key={id} value={id}>{labelText}</option>)}
-      </select>
-    </Field>
-  );
+  const options = values.map(([id, labelText]) => ({ id, label: labelText }));
+  return <SearchableSelect disabled={disabled} label={label} options={options} value={value} onChange={onChange} />;
 }
 
 function LookupSelect({ allowAny = false, disabled, label, lookups, onChange, value }: { allowAny?: boolean; disabled?: boolean; label: string; lookups: LegalLookup[]; onChange: (value: number) => void; value: number }) {
+  const options = [
+    ...(allowAny ? [{ id: "0", label: "Any" }] : []),
+    ...lookups.map((item) => ({ id: String(item.id), label: item.label, code: item.code })),
+  ];
+  return <SearchableSelect disabled={disabled} label={label} options={options} value={String(value || 0)} onChange={(nextValue) => onChange(Number(nextValue))} />;
+}
+
+function SearchableSelect({ disabled, label, onChange, options, value }: { disabled?: boolean; label: string; onChange: (value: string) => void; options: Array<{ id: string; label: string; code?: string }>; value: string }) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.id === value);
+  const visible = options.filter((option) => option.label.toLowerCase().includes(filter.toLowerCase()) || (option.code ?? "").toLowerCase().includes(filter.toLowerCase()));
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [open]);
+
+  function selectOption(nextValue: string) {
+    onChange(nextValue);
+    setOpen(false);
+    setFilter("");
+  }
+
   return (
     <Field label={label}>
-      <select className="field h-10 w-full rounded-lg px-3 text-sm disabled:opacity-70" disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} value={value || 0}>
-        {allowAny ? <option value={0}>Any</option> : null}
-        {lookups.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-      </select>
+      <div className="relative" ref={dropdownRef}>
+        <button
+          className="field flex h-10 w-full items-center justify-between rounded-lg px-3 text-left text-sm disabled:opacity-70"
+          disabled={disabled}
+          onClick={() => {
+            setOpen((current) => !current);
+            setFilter("");
+          }}
+          type="button"
+        >
+          <span className="truncate">{selected?.label ?? "Any"}</span>
+          <ChevronDown size={16} />
+        </button>
+        {open ? (
+          <div className="absolute z-30 mt-2 w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-strong)] p-3 shadow-[var(--shadow-panel)]">
+            <input autoFocus className="field mb-2 h-9 w-full rounded-lg px-3 text-sm" onChange={(event) => setFilter(event.target.value)} placeholder="Filter options" value={filter} />
+            <div className="max-h-52 overflow-y-auto py-1">
+              {visible.length ? visible.map((option) => (
+                <button
+                  className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-[color:var(--surface-muted)] ${option.id === value ? "font-semibold text-[color:var(--brand)]" : "text-[color:var(--foreground)]"}`}
+                  key={option.id}
+                  onClick={() => selectOption(option.id)}
+                  type="button"
+                >
+                  <span className="truncate">{option.label}</span>
+                  {option.code ? <span className="ml-3 shrink-0 text-xs text-[color:var(--foreground-muted)]">{option.code}</span> : null}
+                </button>
+              )) : <p className="px-3 py-2 text-sm text-[color:var(--foreground-muted)]">No options found.</p>}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </Field>
   );
 }
@@ -1010,12 +1080,21 @@ function defaultCriteria(): SearchCriteria {
   };
 }
 
-function groupByLegalType(cards: LegalCard[]) {
+function groupByLegalType(cards: LegalCard[], legalTypes: LegalLookup[]) {
   return cards.reduce<Record<string, LegalCard[]>>((groups, card) => {
-    const key = card.legalType?.trim() || "Any";
+    const key = legalTypeGroupLabel(card, legalTypes);
     groups[key] = [...(groups[key] ?? []), card];
     return groups;
   }, {});
+}
+
+function legalTypeGroupLabel(card: LegalCard, legalTypes: LegalLookup[]) {
+  const lookupLabel = legalTypes.find((item) => item.id === card.legalTypeId)?.label?.trim();
+  if (lookupLabel) {
+    return lookupLabel;
+  }
+  const cardLabel = card.legalType?.trim();
+  return cardLabel || "Unassigned Legal Type";
 }
 
 function cloneCard(card: LegalCard): LegalCard {
@@ -1026,34 +1105,50 @@ function cloneCard(card: LegalCard): LegalCard {
   };
 }
 
-function maskTemporaryLegalLookups(lookups: LegalLookups): LegalLookups {
-  return {
-    ...lookups,
-    legalTypes: [],
-    stages: [],
-    reasons: [],
-  };
-}
-
-function maskTemporaryLegalCards(cards: LegalCard[]) {
-  return cards.map(maskTemporaryLegalCard);
-}
-
-function maskTemporaryLegalCard(card: LegalCard): LegalCard {
-  return {
-    ...card,
-    legalType: "",
-    currentStage: "",
-    reason: "",
-  };
-}
-
 function labelFor(lookups: LegalLookup[], id: number) {
   return lookups.find((item) => item.id === id)?.label ?? `#${id}`;
 }
 
-function firstId(lookups: LegalLookup[], fallback: number) {
-  return lookups[0]?.id ?? fallback;
+function unitsForProperty(units: LegalLookup[], propertyId?: number) {
+  if (!propertyId) {
+    return units;
+  }
+  return units.filter((unit) => unit.parentId === propertyId);
+}
+
+function lookupValueFor(lookups: LegalLookup[], value?: number) {
+  if (!value) {
+    return 0;
+  }
+  return lookups.some((lookup) => lookup.id === value) ? value : 0;
+}
+
+function firstId(lookups: LegalLookup[]) {
+  return lookups[0]?.id ?? 0;
+}
+
+function approvedStatusId(lookups: LegalLookup[]) {
+  return defaultStatusId(lookups, "APPROVED");
+}
+
+function defaultStatusId(lookups: LegalLookup[], status: string) {
+  return lookups.find((lookup) => isLookupValue(lookup, status))?.id ?? 0;
+}
+
+function completedDocumentStatusIds(lookups: LegalLookup[]) {
+  return lookups.filter((lookup) => isLookupValue(lookup, "COMPLETED")).map((lookup) => lookup.id);
+}
+
+function isDocumentStatus(id: number | undefined, lookups: LegalLookup[], status: string) {
+  return lookups.some((lookup) => lookup.id === id && isLookupValue(lookup, status));
+}
+
+function isLookupValue(lookup: LegalLookup, status: string) {
+  return normalizedLookupText(lookup.label) === status || normalizedLookupText(lookup.code) === status;
+}
+
+function normalizedLookupText(value?: string) {
+  return (value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 function priorityLabel(code: string) {

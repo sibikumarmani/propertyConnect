@@ -43,6 +43,7 @@
 		<result column="code" property="code" jdbcType="VARCHAR" />
 		<result column="name" property="name" jdbcType="VARCHAR" />
 		<result column="description" property="description" jdbcType="VARCHAR" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
 		<result column="parent_id" property="parentId" jdbcType="BIGINT" />
 		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
 		<result column="attributes" property="attributes" jdbcType="LONGVARCHAR" />
@@ -183,10 +184,31 @@
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 
-	<select id="listBlocks" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_block WHERE parent_id = #{propertyId} AND active_status = 'Y' ORDER BY sort_order, name</select>
-	<select id="listFloors" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_floor WHERE parent_id = #{blockId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="listBlocks" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, NULL property_id, code, name, description, parent_id, sort_order, attributes, NULL status, active_status, updated_by, updated_on
+		FROM pa_mst_block
+		WHERE parent_id = #{propertyId} AND active_status = 'Y'
+		ORDER BY sort_order, name
+	</select>
+	<select id="listFloors" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, NULL property_id, code, name, description, parent_id, sort_order, attributes, NULL status, active_status, updated_by, updated_on
+		FROM pa_mst_floor
+		WHERE parent_id = #{blockId} AND active_status = 'Y'
+		ORDER BY sort_order, name
+	</select>
 	<select id="listUnits" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_unit WHERE parent_id = #{floorId} AND active_status = 'Y' ORDER BY sort_order, name</select>
-	<select id="listAmenities" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_amenity WHERE parent_id = #{propertyId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="listCompanyUnits" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, property_id, code, name, description, parent_id, sort_order, attributes, status, active_status, updated_by, updated_on
+		FROM pa_mst_unit
+		WHERE company_id = #{companyId} AND active_status = 'Y'
+		ORDER BY property_name, sort_order, name
+	</select>
+	<select id="listAmenities" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, NULL property_id, code, name, description, parent_id, sort_order, attributes, NULL status, active_status, updated_by, updated_on
+		FROM pa_mst_amenity
+		WHERE parent_id = #{propertyId} AND active_status = 'Y'
+		ORDER BY sort_order, name
+	</select>
 
 	<sql id="insertMasterColumns">(company_id, code, name, description, parent_id, sort_order, attributes, active_status, created_by, updated_by)</sql>
 	<sql id="insertMasterValues">(#{companyId}, #{code}, #{name}, #{description}, #{parentId}, #{sortOrder}, #{attributes}, #{activeStatus}, #{createdBy}, #{updatedBy})</sql>

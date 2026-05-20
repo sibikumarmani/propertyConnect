@@ -129,6 +129,7 @@ body,
 
 a {
   color: inherit;
+  cursor: pointer !important;
   text-decoration: none;
 }
 
@@ -137,6 +138,29 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+.btn-primary,
+.btn-secondary,
+label[for],
+label:has(input[type="file"]),
+select,
+summary,
+[role="button"],
+[role="link"],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer !important;
+}
+
+button:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
 }
 
 .display-font {

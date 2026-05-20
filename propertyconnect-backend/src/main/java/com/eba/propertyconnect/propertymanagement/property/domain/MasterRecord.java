@@ -9,6 +9,7 @@ public class MasterRecord {
 	public String code;
 	public String name;
 	public String description;
+	public Long propertyId;
 	public Long parentId;
 	public Integer sortOrder;
 	public String attributes;

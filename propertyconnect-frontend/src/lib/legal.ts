@@ -2,18 +2,33 @@
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_PROPERTYCONNECT_API_URL ?? "http://localhost:8080/propertyConnect/api";
 const legalManagementBaseUrl = `${apiBaseUrl}/propertymanagement/legal-management`;
+const allowedApprovalStatusLabels: Record<string, string> = {
+  APPROVE: "Approved",
+  APPROVED: "Approved",
+  SUBMIT: "Submitted",
+  SUBMITTED: "Submitted",
+  RETURN: "Returned",
+  RETURNED: "Returned",
+  REJECT: "Rejected",
+  REJECTED: "Rejected",
+};
 
 export type LegalLookup = {
   id: number;
   code?: string;
   label: string;
+  parentId?: number;
 };
 
 export type LegalLookups = {
   legalTypes: LegalLookup[];
   stages: LegalLookup[];
   reasons: LegalLookup[];
+  tenants: LegalLookup[];
+  properties: LegalLookup[];
+  units: LegalLookup[];
   documentStatuses: LegalLookup[];
+  cardFlows: LegalLookup[];
   approvalStatuses: LegalLookup[];
   documentTypes: LegalLookup[];
 };
@@ -107,7 +122,29 @@ export type LegalDashboard = {
 };
 
 export async function getLegalLookups() {
-  return request<LegalLookups>("/lookups");
+  const companyId = selectedCompanyId();
+  const params = new URLSearchParams();
+  if (companyId) {
+    params.set("companyId", String(companyId));
+  }
+  const clientId = selectedClientId();
+  if (clientId) {
+    params.set("clientId", String(clientId));
+  }
+  const lookups = await request<LegalLookups>(`/lookups${params.size ? `?${params.toString()}` : ""}`);
+  return {
+    ...lookups,
+    approvalStatuses: legalApprovalStatusOptions(lookups.approvalStatuses),
+  };
+}
+
+export function legalApprovalStatusOptions(statuses: LegalLookup[] = []) {
+  return statuses
+    .map((status) => {
+      const label = approvalStatusLabel(status.label) ?? approvalStatusLabel(status.code);
+      return label ? { ...status, label } : null;
+    })
+    .filter((status): status is LegalLookup => status !== null);
 }
 
 export async function getLegalDashboard() {
@@ -194,6 +231,27 @@ function selectedCompanyId(): number | undefined {
   }
 }
 
+function selectedClientId(): number | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  const rawCompany = localStorage.getItem("propertyConnect.selectedCompany") ?? sessionStorage.getItem("propertyConnect.selectedCompany");
+  if (rawCompany) {
+    try {
+      const company = JSON.parse(rawCompany) as { clientId?: unknown };
+      const value = numericValue(company.clientId);
+      if (value) {
+        return value;
+      }
+    } catch {
+      // Ignore malformed stored company data and fall back to profile storage.
+    }
+  }
+  const profile = storedObject("propertyConnect.userProfile");
+  const nestedProfile = objectValue(profile?.userProfile) ?? objectValue(profile?.loggedUserProfile) ?? objectValue(profile?.loggedUser) ?? objectValue(profile?.user);
+  return numericValue(nestedProfile?.clientId ?? profile?.clientId);
+}
+
 function loggedUserId(): number | undefined {
   if (typeof window === "undefined") {
     return undefined;
@@ -202,6 +260,15 @@ function loggedUserId(): number | undefined {
   const profile = storedObject("propertyConnect.userProfile");
   const nestedProfile = objectValue(profile?.userProfile) ?? objectValue(profile?.loggedUserProfile) ?? objectValue(profile?.loggedUser) ?? objectValue(profile?.user);
   return numericValue(nestedProfile?.id ?? nestedProfile?.userId ?? profile?.id ?? profile?.userId ?? user?.id);
+}
+
+function approvalStatusLabel(value: unknown): string | undefined {
+  const key = normalizedStatus(value);
+  return key ? allowedApprovalStatusLabels[key] : undefined;
+}
+
+function normalizedStatus(value: unknown): string {
+  return typeof value === "string" ? value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
 }
 
 function storedObject(key: string): Record<string, unknown> | null {

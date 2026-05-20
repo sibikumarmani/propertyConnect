@@ -34,6 +34,7 @@ import jakarta.ws.rs.core.Response;
 public class LegalResource {
 
 	private static final String CORE_USER_ID = "userId";
+	private static final String CORE_CLIENT_ID = "clientId";
 	private static final String CORE_COMPANY_ID = "companyId";
 	private static final String CORE_SELECTED_COMPANY_ID = "selectedCompanyId";
 	private static final String SESSION_SELECTED_COMPANY_ID = "propertyConnect.selectedCompanyId";
@@ -53,14 +54,14 @@ public class LegalResource {
 
 	@GET
 	@Path("/lookups")
-	public Response lookups() {
-		return ok(service.lookups());
+	public Response lookups(@QueryParam("companyId") Long companyId, @QueryParam("clientId") Long clientId) {
+		return ok(service.lookups(loggedCompanyId(companyId), loggedClientId(clientId)));
 	}
 
 	@GET
 	@Path("/dashboard")
 	public Response dashboard(@QueryParam("companyId") Long companyId) {
-		return ok(service.dashboard(loggedCompanyId(companyId)));
+		return ok(service.dashboard(loggedCompanyId(companyId), loggedClientId(null)));
 	}
 
 	@POST
@@ -70,13 +71,13 @@ public class LegalResource {
 			request = new LegalCardSearch();
 		}
 		request.companyId = loggedCompanyId(request.companyId);
-		return ok(service.searchLegalCards(request));
+		return ok(service.searchLegalCards(request, loggedClientId(null)));
 	}
 
 	@GET
 	@Path("/legal-cards/{id}")
 	public Response getLegalCard(@PathParam("id") Long id) {
-		return okOrBadRequest(() -> service.getLegalCard(id));
+		return okOrBadRequest(() -> service.getLegalCard(id, loggedCompanyId(null), loggedClientId(null)));
 	}
 
 	@POST
@@ -85,7 +86,7 @@ public class LegalResource {
 		return created(() -> {
 			request.companyId = loggedCompanyId(request.companyId);
 			request.createdBy = loggedUserId(request.createdBy);
-			return service.createLegalCard(request);
+			return service.createLegalCard(request, loggedClientId(null));
 		});
 	}
 
@@ -95,7 +96,7 @@ public class LegalResource {
 		return okOrBadRequest(() -> {
 			request.companyId = loggedCompanyId(request.companyId);
 			request.updatedBy = loggedUserId(request.updatedBy);
-			return service.updateLegalCard(id, request);
+			return service.updateLegalCard(id, request.companyId, request, loggedClientId(null));
 		});
 	}
 
@@ -104,7 +105,7 @@ public class LegalResource {
 	public Response workflow(@PathParam("id") Long id, LegalWorkflowRequest request) {
 		return okOrBadRequest(() -> {
 			request.updatedBy = loggedUserId(request.updatedBy);
-			return service.workflow(id, request);
+			return service.workflow(id, loggedCompanyId(null), request, loggedClientId(null));
 		});
 	}
 
@@ -173,6 +174,17 @@ public class LegalResource {
 			return requestCompanyId;
 		}
 		throw new IllegalArgumentException("Logged company is required");
+	}
+
+	private Long loggedClientId(Long requestClientId) {
+		HttpSession session = httpRequest == null ? null : httpRequest.getSession(false);
+		if (session != null) {
+			Long clientId = toCompanyId(session.getAttribute(CORE_CLIENT_ID));
+			if (clientId != null) {
+				return clientId;
+			}
+		}
+		return requestClientId;
 	}
 
 	private Long userIdFromSession() {

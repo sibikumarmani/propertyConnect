@@ -150,6 +150,13 @@ public class PropertyService {
 		return mapper.listUnits(floorId);
 	}
 
+	public List<MasterRecord> companyUnits(Long companyId) {
+		if (companyId == null || companyId <= 0) {
+			return List.of();
+		}
+		return mapper.listCompanyUnits(companyId);
+	}
+
 	public MasterRecord saveUnit(Long floorId, MasterRecord request) {
 		MasterRecord record = normalizeStructure(request, floorId, "Unit");
 		record.parentId = floorId;
