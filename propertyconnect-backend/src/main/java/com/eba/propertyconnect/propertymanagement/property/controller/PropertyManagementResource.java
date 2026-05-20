@@ -1,6 +1,7 @@
 package com.eba.propertyconnect.propertymanagement.property.controller;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.apache.ibatis.exceptions.PersistenceException;
 
@@ -8,6 +9,7 @@ import com.eba.propertyconnect.propertymanagement.auth.service.TokenService;
 import com.eba.propertyconnect.propertymanagement.property.domain.MasterRecord;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertyMaster;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertySearch;
+import com.eba.propertyconnect.propertymanagement.property.domain.PropertyViewTabRow;
 import com.eba.propertyconnect.propertymanagement.property.domain.WorkflowRow;
 import com.eba.propertyconnect.propertymanagement.property.service.MasterService;
 import com.eba.propertyconnect.propertymanagement.property.service.PropertyService;
@@ -315,6 +317,31 @@ public class PropertyManagementResource {
 	@Path("/properties/{id}/summary")
 	public Response summary(@PathParam("id") Long propertyId) {
 		return okOrBadRequest(() -> propertyService.summary(propertyId));
+	}
+
+	@GET
+	@Path("/properties/{id}/view-tabs/{entityType}/{entityId}/{tabCode}")
+	public Response viewTabRows(@PathParam("id") Long propertyId, @PathParam("entityType") String entityType,
+			@PathParam("entityId") Long entityId, @PathParam("tabCode") String tabCode) {
+		return okOrBadRequest(() -> propertyService.viewTabRows(propertyId, entityType, entityId, tabCode));
+	}
+
+	@PUT
+	@Path("/properties/{id}/view-tabs/{entityType}/{entityId}/{tabCode}")
+	public Response saveViewTabRows(@PathParam("id") Long propertyId, @PathParam("entityType") String entityType,
+			@PathParam("entityId") Long entityId, @PathParam("tabCode") String tabCode, List<PropertyViewTabRow> rows) {
+		return okOrBadRequest(() -> {
+			Long userId = loggedUserId(null);
+			if (rows != null) {
+				for (PropertyViewTabRow row : rows) {
+					if (row != null) {
+						row.updatedBy = row.updatedBy == null ? userId : row.updatedBy;
+						row.createdBy = row.createdBy == null ? row.updatedBy : row.createdBy;
+					}
+				}
+			}
+			return propertyService.saveViewTabRows(propertyId, entityType, entityId, tabCode, rows);
+		});
 	}
 
 	private Response okOrBadRequest(Action action) {

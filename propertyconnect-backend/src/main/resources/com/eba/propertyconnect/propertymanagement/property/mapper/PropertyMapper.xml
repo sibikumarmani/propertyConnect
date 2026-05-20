@@ -92,6 +92,23 @@
 		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
 	</resultMap>
 
+	<resultMap id="resultMapViewTabRow" type="com.eba.propertyconnect.propertymanagement.property.domain.PropertyViewTabRow">
+		<id column="id" property="id" jdbcType="BIGINT" />
+		<result column="company_id" property="companyId" jdbcType="BIGINT" />
+		<result column="property_id" property="propertyId" jdbcType="BIGINT" />
+		<result column="entity_type" property="entityType" jdbcType="VARCHAR" />
+		<result column="entity_id" property="entityId" jdbcType="BIGINT" />
+		<result column="tab_code" property="tabCode" jdbcType="VARCHAR" />
+		<result column="row_type" property="rowType" jdbcType="VARCHAR" />
+		<result column="row_data" property="rowData" jdbcType="LONGVARCHAR" />
+		<result column="sort_order" property="sortOrder" jdbcType="INTEGER" />
+		<result column="active_status" property="activeStatus" jdbcType="VARCHAR" />
+		<result column="created_by" property="createdBy" jdbcType="BIGINT" />
+		<result column="created_on" property="createdOn" jdbcType="TIMESTAMP" />
+		<result column="updated_by" property="updatedBy" jdbcType="BIGINT" />
+		<result column="updated_on" property="updatedOn" jdbcType="TIMESTAMP" />
+	</resultMap>
+
 	<select id="listProperties" resultMap="resultMapProperty">
 		SELECT p.*,
 			(SELECT COUNT(*) FROM pa_mst_block b WHERE b.parent_id = p.id AND b.active_status = 'Y') total_blocks,
@@ -196,11 +213,21 @@
 		WHERE parent_id = #{propertyId} AND active_status = 'Y'
 		ORDER BY sort_order, name
 	</select>
+	<select id="getBlock" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, NULL property_id, code, name, description, parent_id, sort_order, attributes, NULL status, active_status, updated_by, updated_on
+		FROM pa_mst_block
+		WHERE id = #{id}
+	</select>
 	<select id="listFloors" parameterType="long" resultMap="resultMapMasterRecord">
 		SELECT id, company_id, NULL property_id, code, name, description, parent_id, sort_order, attributes, NULL status, active_status, updated_by, updated_on
 		FROM pa_mst_floor
 		WHERE parent_id = #{blockId} AND active_status = 'Y'
 		ORDER BY sort_order, name
+	</select>
+	<select id="getFloor" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, NULL property_id, code, name, description, parent_id, sort_order, attributes, NULL status, active_status, updated_by, updated_on
+		FROM pa_mst_floor
+		WHERE id = #{id}
 	</select>
 
 	<update id="deactivateDocumentRows">
@@ -210,6 +237,11 @@
 	</update>
 
 	<select id="listUnits" parameterType="long" resultMap="resultMapMasterRecord">SELECT * FROM pa_mst_unit WHERE parent_id = #{floorId} AND active_status = 'Y' ORDER BY sort_order, name</select>
+	<select id="getUnit" parameterType="long" resultMap="resultMapMasterRecord">
+		SELECT id, company_id, property_id, code, name, description, parent_id, sort_order, attributes, status, active_status, updated_by, updated_on
+		FROM pa_mst_unit
+		WHERE id = #{id}
+	</select>
 	<select id="listCompanyUnits" parameterType="long" resultMap="resultMapMasterRecord">
 		SELECT id, company_id, property_id, code, name, description, parent_id, sort_order, attributes, status, active_status, updated_by, updated_on
 		FROM pa_mst_unit
@@ -226,7 +258,7 @@
 	<sql id="insertMasterColumns">(company_id, code, name, description, parent_id, sort_order, attributes, active_status, created_by, updated_by)</sql>
 	<sql id="insertMasterValues">(#{companyId}, #{code}, #{name}, #{description}, #{parentId}, #{sortOrder}, #{attributes}, #{activeStatus}, #{createdBy}, #{updatedBy})</sql>
 	<sql id="updateMasterSet">
-		code = #{code}, name = #{name}, description = #{description}, sort_order = #{sortOrder}, attributes = #{attributes},
+		company_id = #{companyId}, code = #{code}, name = #{name}, description = #{description}, sort_order = #{sortOrder}, attributes = #{attributes},
 		active_status = #{activeStatus}, updated_by = #{updatedBy}, updated_on = CURRENT_TIMESTAMP
 	</sql>
 
@@ -279,6 +311,31 @@
 		VALUES (#{propertyId}, #{stepCode}, #{stepName}, #{ownerName}, #{progressPercent}, #{state}, #{sortOrder}, #{updatedBy})
 		ON DUPLICATE KEY UPDATE step_name = VALUES(step_name), owner_name = VALUES(owner_name), progress_percent = VALUES(progress_percent),
 			state = VALUES(state), sort_order = VALUES(sort_order), updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
+		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
+	</insert>
+
+	<select id="listViewTabRows" resultMap="resultMapViewTabRow">
+		SELECT *
+		FROM pa_txn_property_view_tab_data
+		WHERE property_id = #{propertyId}
+			AND entity_type = #{entityType}
+			AND entity_id = #{entityId}
+			AND tab_code = #{tabCode}
+			AND active_status = 'Y'
+		ORDER BY sort_order, id
+	</select>
+
+	<select id="getViewTabRow" parameterType="long" resultMap="resultMapViewTabRow">
+		SELECT * FROM pa_txn_property_view_tab_data WHERE id = #{id}
+	</select>
+
+	<insert id="upsertViewTabRow" parameterType="com.eba.propertyconnect.propertymanagement.property.domain.PropertyViewTabRow">
+		INSERT INTO pa_txn_property_view_tab_data
+			(id, company_id, property_id, entity_type, entity_id, tab_code, row_type, row_data, sort_order, active_status, created_by, updated_by)
+		VALUES
+			(#{id}, #{companyId}, #{propertyId}, #{entityType}, #{entityId}, #{tabCode}, #{rowType}, #{rowData}, #{sortOrder}, #{activeStatus}, #{createdBy}, #{updatedBy})
+		ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), row_type = VALUES(row_type), row_data = VALUES(row_data),
+			sort_order = VALUES(sort_order), active_status = VALUES(active_status), updated_by = VALUES(updated_by), updated_on = CURRENT_TIMESTAMP
 		<selectKey keyProperty="id" resultType="long" order="AFTER">SELECT LAST_INSERT_ID()</selectKey>
 	</insert>
 

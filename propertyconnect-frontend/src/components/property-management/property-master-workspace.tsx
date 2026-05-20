@@ -45,7 +45,7 @@ import {
   type WorkflowRow,
 } from "@/lib/property-management";
 
-type TabKey = "profile" | "ownership" | "documents" | "structure" | "commercial" | "operations";
+type TabKey = "profile" | "ownership" | "documents" | "structure" | "amenities" | "commercial" | "operations";
 type ReadOnlyTabKey = "profile" | "documents" | "blocks" | "amenities" | "operating" | "workflow";
 type DraftRecord = MasterRecord & { draftKey?: string; kind?: "block" | "floor" | "unit" | "amenity" };
 type OwnershipRow = PropertyOwnershipRow & { draftKey: string; shareRight: string; reference: string; status: string };
@@ -71,6 +71,7 @@ const tabs: { key: TabKey; label: string; icon: typeof Building2 }[] = [
   { key: "ownership", label: "Ownership", icon: ShieldCheck },
   { key: "documents", label: "Documents", icon: FileText },
   { key: "structure", label: "Structure Setup", icon: Layers3 },
+  { key: "amenities", label: "Amenities", icon: ShieldCheck },
   { key: "commercial", label: "Commercial & Finance", icon: FileText },
   { key: "operations", label: "Operations Setup", icon: ShieldCheck },
 ];
@@ -210,7 +211,7 @@ export function PropertyMasterWorkspace() {
     }
   }
 
-  async function editProperty(property: PropertyMaster) {
+  async function editProperty(property: PropertyMaster, startTab: TabKey = "profile") {
     if (!property.id) return;
     setSaving(true);
     setError("");
@@ -220,7 +221,7 @@ export function PropertyMasterWorkspace() {
       setSelectedId(loaded.id ?? null);
       loadPropertyIntoForm(loaded);
       setDrawerOpen(true);
-      setTab("profile");
+      setTab(startTab);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load property for edit.");
     } finally {
@@ -423,7 +424,7 @@ export function PropertyMasterWorkspace() {
           blocks={blocks}
           documents={documentRows}
           onCreate={startNewProperty}
-          onEdit={selectedProperty ? () => void editProperty(selectedProperty) : undefined}
+          onEdit={selectedProperty ? () => void editProperty(selectedProperty, readOnlyToDrawerTab(readOnlyTab)) : undefined}
           onTabChange={setReadOnlyTab}
           onView={selectedProperty?.id ? () => router.push(`/propertyconnect/property-management/property-view?propertyId=${selectedProperty.id}`) : undefined}
           ownership={ownershipRows}
@@ -434,7 +435,7 @@ export function PropertyMasterWorkspace() {
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-[color:var(--overlay)]">
-          <section className="h-full w-full max-w-6xl overflow-y-auto bg-[color:var(--surface-strong)] shadow-2xl">
+          <section className="h-full w-full max-w-[1440px] overflow-y-auto bg-[color:var(--surface-strong)] shadow-2xl">
           <div className="flex items-start justify-between border-b border-[color:var(--line)] px-5 py-4">
             <div>
               <p className="text-xs font-bold text-[color:var(--foreground-muted)]">Property Intake</p>
@@ -445,12 +446,12 @@ export function PropertyMasterWorkspace() {
             </button>
           </div>
 
-          <div className="mx-5 mt-5 flex gap-1 overflow-x-auto rounded-lg bg-[color:var(--surface-muted)] p-1">
+          <div className="mx-5 mt-5 flex flex-nowrap gap-1 rounded-lg bg-[color:var(--surface-muted)] p-1">
             {tabs.map((item) => {
               const Icon = item.icon;
               return (
-                <button className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold ${tab === item.key ? "bg-[color:var(--surface-raised)] text-[color:var(--brand)] shadow-sm" : "text-[color:var(--foreground-muted)]"}`} key={item.key} onClick={() => setTab(item.key)} type="button">
-                  <Icon className="h-4 w-4" /> {item.label}
+                <button className={`inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-bold xl:text-sm ${tab === item.key ? "bg-[color:var(--surface-raised)] text-[color:var(--brand)] shadow-sm" : "text-[color:var(--foreground-muted)]"}`} key={item.key} onClick={() => setTab(item.key)} type="button">
+                  <Icon className="h-4 w-4 shrink-0" /> <span className="truncate">{item.label}</span>
                 </button>
               );
             })}
@@ -514,9 +515,17 @@ export function PropertyMasterWorkspace() {
                   <RecordTable title="Buildings / Blocks" records={blocks} selectedId={blockId} onSelect={(row) => void selectBlock(row)} onAdd={() => setBlocks([...blocks, newRecord("block", blocks.length + 1)])} onChange={(index, value) => updateRecord(setBlocks, index, value)} onRemove={(index) => removeDraftRow("blocks", index)} />
                   <RecordTable title="Floors" records={floors} selectedId={floorId} onSelect={(row) => void selectFloor(row)} onAdd={() => setFloors([...floors, newRecord("floor", floors.length + 1, blockId)])} onChange={(index, value) => updateRecord(setFloors, index, value)} onRemove={(index) => removeDraftRow("floors", index)} disabled={!blockId && blocks.every((row) => !row.id)} />
                   <RecordTable title="Units" records={units} onAdd={() => setUnits([...units, newRecord("unit", units.length + 1, floorId)])} onChange={(index, value) => updateRecord(setUnits, index, value)} onRemove={(index) => removeDraftRow("units", index)} disabled={!floorId && floors.every((row) => !row.id)} />
-                  <RecordTable title="Amenities" records={amenities} onAdd={() => setAmenities([...amenities, newRecord("amenity", amenities.length + 1)])} onChange={(index, value) => updateRecord(setAmenities, index, value)} onRemove={(index) => removeDraftRow("amenities", index)} />
                 </div>
               </div>
+            ) : null}
+
+            {tab === "amenities" ? (
+              <AmenityEditTable
+                records={amenities}
+                onAdd={() => setAmenities([...amenities, newAmenityRecord(amenities.length + 1)])}
+                onChange={(index, value) => updateRecord(setAmenities, index, value)}
+                onRemove={(index) => removeDraftRow("amenities", index)}
+              />
             ) : null}
 
             {tab === "commercial" ? (
@@ -625,6 +634,15 @@ export function PropertyMasterWorkspace() {
     }
     if (documentRows.some((row) => hasDocumentInput(row) && (!row.document.trim() || !row.reference.trim()))) {
       throw new Error("Document and reference are required for every document row.");
+    }
+    if (amenities.some((row) => hasAmenityInput(row) && !row.name?.trim())) {
+      throw new Error("Amenity name is required for every amenity row.");
+    }
+    if (amenities.some((row) => {
+      const capacity = parseRecordAttributes(row.attributes).capacity;
+      return capacity !== undefined && capacity !== "" && (!Number.isFinite(Number(capacity)) || Number(capacity) < 0);
+    })) {
+      throw new Error("Amenity capacity must be a positive number.");
     }
   }
 
@@ -793,9 +811,12 @@ function ReadOnlyPropertyPanel({
 
         {activeTab === "amenities" ? (
           <ReadOnlyRows
-            columns={["Amenity", "Code", "Description", "Sort", "Status"]}
+            columns={["Amenity", "Location", "Capacity", "Booking", "Status"]}
             emptyLabel="No amenities saved."
-            rows={amenities.map((row) => [row.name, row.code, row.description, String(row.sortOrder ?? 0), activeStatusLabel(row.activeStatus)])}
+            rows={amenities.map((row) => {
+              const attrs = parseRecordAttributes(row.attributes);
+              return [row.name, attrs.location, attrs.capacity, attrs.booking, attrs.status || activeStatusLabel(row.activeStatus)];
+            })}
           />
         ) : null}
 
@@ -929,6 +950,57 @@ function RecordTable({
                 <RemoveCell onRemove={() => onRemove(index)} />
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function AmenityEditTable({ records, onAdd, onChange, onRemove }: { records: DraftRecord[]; onAdd: () => void; onChange: (index: number, row: DraftRecord) => void; onRemove: (index: number) => void }) {
+  return (
+    <section className="rounded-lg border border-[color:var(--line)]">
+      <div className="flex items-center justify-between border-b border-[color:var(--line)] px-3 py-2">
+        <div>
+          <h3 className="text-sm font-bold text-[color:var(--brand-strong)]">Amenities</h3>
+          <p className="mt-0.5 text-xs text-[color:var(--foreground-muted)]">Capture amenity location, capacity and booking requirements.</p>
+        </div>
+        <button className="btn-secondary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold" onClick={onAdd} type="button">
+          <Plus className="h-3.5 w-3.5" /> Add
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[820px] text-left text-sm">
+          <thead className="bg-[color:var(--surface-muted)] text-xs uppercase text-[color:var(--foreground-muted)]">
+            <tr>
+              <th className="px-3 py-2">Amenity</th>
+              <th className="px-3 py-2">Location</th>
+              <th className="px-3 py-2">Capacity</th>
+              <th className="px-3 py-2">Booking</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.length === 0 ? <tr><td className="px-3 py-3 text-[color:var(--foreground-muted)]" colSpan={6}>No amenities captured.</td></tr> : null}
+            {records.map((row, index) => {
+              const attrs = parseRecordAttributes(row.attributes);
+              return (
+                <tr key={row.id ?? row.draftKey}>
+                  <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-full rounded-md px-2 py-1" value={row.name ?? ""} onChange={(event) => onChange(index, { ...row, name: event.target.value, code: row.code || codeFromName(event.target.value) })} /></td>
+                  <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-full rounded-md px-2 py-1" value={attrs.location ?? ""} onChange={(event) => onChange(index, withAmenityAttr(row, "location", event.target.value))} /></td>
+                  <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-full rounded-md px-2 py-1" min="0" type="number" value={attrs.capacity ?? ""} onChange={(event) => onChange(index, withAmenityAttr(row, "capacity", event.target.value))} /></td>
+                  <td className="border-t border-[color:var(--line)] px-2 py-2"><input className="field w-full rounded-md px-2 py-1" value={attrs.booking ?? ""} onChange={(event) => onChange(index, withAmenityAttr(row, "booking", event.target.value))} /></td>
+                  <td className="border-t border-[color:var(--line)] px-2 py-2">
+                    <select className="field w-full rounded-md px-2 py-1" value={attrs.status || "Active"} onChange={(event) => onChange(index, withAmenityAttr(row, "status", event.target.value))}>
+                      <option value="Active">Active</option>
+                      <option value="Review">Review</option>
+                    </select>
+                  </td>
+                  {!row.id ? <RemoveCell onRemove={() => onRemove(index)} /> : <td className="border-t border-[color:var(--line)] px-2 py-2 text-right text-xs font-semibold text-[color:var(--foreground-muted)]">Saved</td>}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1098,6 +1170,10 @@ function newRecord(kind: DraftRecord["kind"], count: number, parentId?: number |
   return { draftKey: crypto.randomUUID(), kind, code: `${prefix}-${String(count).padStart(2, "0")}`, name: "", description: "", parentId: parentId ?? undefined, sortOrder: count, attributes: "{}" };
 }
 
+function newAmenityRecord(count: number): DraftRecord {
+  return { draftKey: crypto.randomUUID(), kind: "amenity", code: `AMN-${String(count).padStart(2, "0")}`, name: "", sortOrder: count, activeStatus: "Y", attributes: JSON.stringify({ location: "", capacity: "", booking: "", status: "Active" }) };
+}
+
 function normalizeRecord(record: DraftRecord): MasterRecord {
   return {
     ...record,
@@ -1106,6 +1182,28 @@ function normalizeRecord(record: DraftRecord): MasterRecord {
     attributes: record.attributes || "{}",
     activeStatus: normalizeActiveStatus(record.activeStatus),
   };
+}
+
+function parseRecordAttributes(raw?: string): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, value == null ? "" : String(value)]));
+  } catch {
+    return {};
+  }
+}
+
+function withAmenityAttr(row: DraftRecord, key: "booking" | "capacity" | "location" | "status", value: string): DraftRecord {
+  return { ...row, attributes: JSON.stringify({ ...parseRecordAttributes(row.attributes), [key]: value }) };
+}
+
+function readOnlyToDrawerTab(tab: ReadOnlyTabKey): TabKey {
+  if (tab === "documents") return "documents";
+  if (tab === "blocks") return "structure";
+  if (tab === "amenities") return "amenities";
+  if (tab === "operating" || tab === "workflow") return "operations";
+  return "profile";
 }
 
 function codeFromName(name: string) {
@@ -1124,6 +1222,11 @@ function hasOwnershipInput(row: OwnershipRow) {
 
 function hasDocumentInput(row: DocumentRow) {
   return Boolean(row.document.trim() || row.reference.trim());
+}
+
+function hasAmenityInput(row: DraftRecord) {
+  const attrs = parseRecordAttributes(row.attributes);
+  return Boolean(row.name?.trim() || attrs.location?.trim() || attrs.capacity?.trim() || attrs.booking?.trim());
 }
 
 function clamp(value: number, min: number, max: number) {

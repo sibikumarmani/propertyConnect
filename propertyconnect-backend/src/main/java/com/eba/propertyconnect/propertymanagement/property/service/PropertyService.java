@@ -15,6 +15,7 @@ import com.eba.propertyconnect.propertymanagement.property.domain.PropertyOwners
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertySearch;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertySummary;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertyTreeNode;
+import com.eba.propertyconnect.propertymanagement.property.domain.PropertyViewTabRow;
 import com.eba.propertyconnect.propertymanagement.property.domain.WorkflowRow;
 import com.eba.propertyconnect.propertymanagement.property.mapper.PropertyMapper;
 import com.eba.propertyconnect.propertymanagement.util.CacheHelper;
@@ -106,8 +107,9 @@ public class PropertyService {
 	}
 
 	public MasterRecord saveBlock(Long propertyId, MasterRecord request) {
-		get(propertyId);
+		PropertyMaster property = get(propertyId);
 		MasterRecord record = normalizeStructure(request, propertyId, "Block");
+		record.companyId = property.companyId;
 		record.parentId = propertyId;
 		if (record.id == null) {
 			mapper.insertBlock(record);
@@ -131,7 +133,9 @@ public class PropertyService {
 	}
 
 	public MasterRecord saveFloor(Long blockId, MasterRecord request) {
+		MasterRecord block = requireBlock(blockId);
 		MasterRecord record = normalizeStructure(request, blockId, "Floor");
+		record.companyId = block.companyId;
 		record.parentId = blockId;
 		if (record.id == null) {
 			mapper.insertFloor(record);
@@ -162,7 +166,9 @@ public class PropertyService {
 	}
 
 	public MasterRecord saveUnit(Long floorId, MasterRecord request) {
+		MasterRecord floor = requireFloor(floorId);
 		MasterRecord record = normalizeStructure(request, floorId, "Unit");
+		record.companyId = floor.companyId;
 		record.parentId = floorId;
 		if (record.id == null) {
 			mapper.insertUnit(record);
@@ -187,7 +193,9 @@ public class PropertyService {
 	}
 
 	public MasterRecord saveAmenity(Long propertyId, MasterRecord request) {
+		PropertyMaster property = get(propertyId);
 		MasterRecord record = normalizeStructure(request, propertyId, "Amenity");
+		record.companyId = property.companyId;
 		record.parentId = propertyId;
 		if (record.id == null) {
 			mapper.insertAmenity(record);
@@ -225,6 +233,44 @@ public class PropertyService {
 		mapper.upsertWorkflow(row);
 		clearCache();
 		return row;
+	}
+
+	public List<PropertyViewTabRow> viewTabRows(Long propertyId, String entityType, Long entityId, String tabCode) {
+		validateViewContext(propertyId, entityType, entityId, tabCode);
+		return mapper.listViewTabRows(propertyId, normalizeEntityType(entityType), entityId, normalizeTabCode(tabCode));
+	}
+
+	@Transactional(rollbackFor = Exception.class)
+	public List<PropertyViewTabRow> saveViewTabRows(Long propertyId, String entityType, Long entityId, String tabCode, List<PropertyViewTabRow> rows) {
+		PropertyMaster property = validateViewContext(propertyId, entityType, entityId, tabCode);
+		if (rows == null) {
+			throw new IllegalArgumentException("Tab rows are required");
+		}
+		String normalizedEntityType = normalizeEntityType(entityType);
+		String normalizedTabCode = normalizeTabCode(tabCode);
+		int sortOrder = 10;
+		for (PropertyViewTabRow row : rows) {
+			if (row == null) {
+				continue;
+			}
+			if (row.id != null) {
+				validateExistingViewRow(row.id, propertyId, normalizedEntityType, entityId, normalizedTabCode);
+			}
+			row.companyId = property.companyId;
+			row.propertyId = propertyId;
+			row.entityType = normalizedEntityType;
+			row.entityId = entityId;
+			row.tabCode = normalizedTabCode;
+			row.rowType = defaultText(row.rowType, normalizedTabCode);
+			row.rowData = normalizeJson(row.rowData);
+			row.sortOrder = row.sortOrder == null ? sortOrder : row.sortOrder;
+			row.activeStatus = normalizeActiveStatus(row.activeStatus);
+			row.createdBy = row.createdBy == null ? row.updatedBy : row.createdBy;
+			mapper.upsertViewTabRow(row);
+			sortOrder += 10;
+		}
+		clearCache();
+		return viewTabRows(propertyId, normalizedEntityType, entityId, normalizedTabCode);
 	}
 
 	public PropertyTreeNode tree(Long propertyId) {
@@ -345,6 +391,92 @@ public class PropertyService {
 		row.sortOrder = sortOrder;
 		row.updatedBy = userId;
 		return row;
+	}
+
+	private PropertyMaster validateViewContext(Long propertyId, String entityType, Long entityId, String tabCode) {
+		PropertyMaster property = get(propertyId);
+		if (entityId == null) {
+			throw new IllegalArgumentException("Selected property entity is required");
+		}
+		String normalizedEntityType = normalizeEntityType(entityType);
+		String normalizedTabCode = normalizeTabCode(tabCode);
+		if (!isTabAllowed(normalizedEntityType, normalizedTabCode)) {
+			throw new IllegalArgumentException("Tab is not available for the selected " + normalizedEntityType.toLowerCase(Locale.ROOT));
+		}
+		if ("BLOCK".equals(normalizedEntityType)) {
+			MasterRecord block = requireBlock(entityId);
+			if (!propertyId.equals(block.parentId)) {
+				throw new IllegalArgumentException("Block does not belong to the selected property");
+			}
+		}
+		if ("FLOOR".equals(normalizedEntityType)) {
+			MasterRecord floor = requireFloor(entityId);
+			MasterRecord block = requireBlock(floor.parentId);
+			if (!propertyId.equals(block.parentId)) {
+				throw new IllegalArgumentException("Floor does not belong to the selected property");
+			}
+		}
+		if ("UNIT".equals(normalizedEntityType)) {
+			MasterRecord unit = requireUnit(entityId);
+			if (!propertyId.equals(unit.propertyId)) {
+				throw new IllegalArgumentException("Unit does not belong to the selected property");
+			}
+		}
+		return property;
+	}
+
+	private void validateExistingViewRow(Long id, Long propertyId, String entityType, Long entityId, String tabCode) {
+		PropertyViewTabRow existing = mapper.getViewTabRow(id);
+		if (existing == null || !propertyId.equals(existing.propertyId) || !entityType.equals(existing.entityType)
+				|| !entityId.equals(existing.entityId) || !tabCode.equals(existing.tabCode)) {
+			throw new IllegalArgumentException("Tab row does not belong to the selected context");
+		}
+	}
+
+	private MasterRecord requireBlock(Long id) {
+		MasterRecord block = mapper.getBlock(id);
+		if (block == null) {
+			throw new IllegalArgumentException("Block not found");
+		}
+		return block;
+	}
+
+	private MasterRecord requireFloor(Long id) {
+		MasterRecord floor = mapper.getFloor(id);
+		if (floor == null) {
+			throw new IllegalArgumentException("Floor not found");
+		}
+		return floor;
+	}
+
+	private MasterRecord requireUnit(Long id) {
+		MasterRecord unit = mapper.getUnit(id);
+		if (unit == null) {
+			throw new IllegalArgumentException("Unit not found");
+		}
+		return unit;
+	}
+
+	private String normalizeEntityType(String entityType) {
+		String normalized = requireText(entityType, "Entity type is required").toUpperCase(Locale.ROOT);
+		if (!List.of("BLOCK", "FLOOR", "UNIT").contains(normalized)) {
+			throw new IllegalArgumentException("Entity type must be BLOCK, FLOOR or UNIT");
+		}
+		return normalized;
+	}
+
+	private String normalizeTabCode(String tabCode) {
+		return requireText(tabCode, "Tab code is required").toUpperCase(Locale.ROOT);
+	}
+
+	private boolean isTabAllowed(String entityType, String tabCode) {
+		if ("BLOCK".equals(entityType)) {
+			return List.of("OWNERSHIP", "DOCUMENTS", "FACILITIES", "ACTIVITY").contains(tabCode);
+		}
+		if ("FLOOR".equals(entityType)) {
+			return List.of("DOCUMENTS", "ACTIVITY").contains(tabCode);
+		}
+		return List.of("OWNERSHIP", "DOCUMENTS", "LEASE", "CHARGES", "ACTIVITY").contains(tabCode);
 	}
 
 	private void normalizeProperty(PropertyMaster request) {

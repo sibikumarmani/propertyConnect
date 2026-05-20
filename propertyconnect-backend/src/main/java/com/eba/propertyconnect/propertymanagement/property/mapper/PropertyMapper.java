@@ -12,6 +12,7 @@ import com.eba.propertyconnect.propertymanagement.property.domain.PropertyOwners
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertySearch;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertySummary;
 import com.eba.propertyconnect.propertymanagement.property.domain.PropertyTreeNode;
+import com.eba.propertyconnect.propertymanagement.property.domain.PropertyViewTabRow;
 import com.eba.propertyconnect.propertymanagement.property.domain.WorkflowRow;
 
 @Mapper
@@ -45,11 +46,17 @@ public interface PropertyMapper {
 
 	public List<MasterRecord> listBlocks(@Param("propertyId") Long propertyId);
 
+	public MasterRecord getBlock(@Param("id") Long id);
+
 	public List<MasterRecord> listFloors(@Param("blockId") Long blockId);
+
+	public MasterRecord getFloor(@Param("id") Long id);
 
 	public List<MasterRecord> listCompanyUnits(Long companyId);
 
 	public List<MasterRecord> listUnits(@Param("floorId") Long floorId);
+
+	public MasterRecord getUnit(@Param("id") Long id);
 
 	public List<MasterRecord> listAmenities(@Param("propertyId") Long propertyId);
 
@@ -80,6 +87,13 @@ public interface PropertyMapper {
 	public List<WorkflowRow> listWorkflow(@Param("propertyId") Long propertyId);
 
 	public int upsertWorkflow(WorkflowRow row);
+
+	public List<PropertyViewTabRow> listViewTabRows(@Param("propertyId") Long propertyId, @Param("entityType") String entityType,
+			@Param("entityId") Long entityId, @Param("tabCode") String tabCode);
+
+	public PropertyViewTabRow getViewTabRow(@Param("id") Long id);
+
+	public int upsertViewTabRow(PropertyViewTabRow row);
 
 	public List<PropertyTreeNode> treeProperties(@Param("propertyId") Long propertyId);
 

@@ -6,6 +6,7 @@ const propertyManagementBaseUrl = `${apiBaseUrl}/propertymanagement/property-man
 export type MasterRecord = {
   id?: number;
   companyId?: number;
+  propertyId?: number;
   code: string;
   name: string;
   description?: string;
@@ -120,6 +121,25 @@ export type PropertyTreeNode = {
   status?: string;
   parentId?: number;
   children?: PropertyTreeNode[];
+};
+
+export type PropertyViewEntityType = "BLOCK" | "FLOOR" | "UNIT";
+
+export type PropertyViewTabRow = {
+  id?: number;
+  companyId?: number;
+  propertyId?: number;
+  entityType?: PropertyViewEntityType;
+  entityId?: number;
+  tabCode?: string;
+  rowType?: string;
+  rowData: string;
+  sortOrder?: number;
+  activeStatus?: "Y" | "N" | string;
+  createdBy?: number;
+  createdOn?: string;
+  updatedBy?: number;
+  updatedOn?: string;
 };
 
 export type PropertySearch = {
@@ -246,6 +266,17 @@ export async function getPropertyTree(propertyId: number) {
 
 export async function getPropertySummary(propertyId: number) {
   return request<PropertySummary>(`/properties/${propertyId}/summary`);
+}
+
+export async function listPropertyViewTabRows(propertyId: number, entityType: PropertyViewEntityType, entityId: number, tabCode: string) {
+  return request<PropertyViewTabRow[]>(`/properties/${propertyId}/view-tabs/${entityType}/${entityId}/${tabCode}`);
+}
+
+export async function savePropertyViewTabRows(propertyId: number, entityType: PropertyViewEntityType, entityId: number, tabCode: string, rows: PropertyViewTabRow[]) {
+  return request<PropertyViewTabRow[]>(`/properties/${propertyId}/view-tabs/${entityType}/${entityId}/${tabCode}`, {
+    method: "PUT",
+    body: rows.map((row) => ({ ...row, updatedBy: row.updatedBy ?? loggedUserId() })),
+  });
 }
 
 async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
